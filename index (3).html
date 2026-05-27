@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VM Betting 🍺</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --green:#1D9E75;--green-dark:#0F6E56;--green-light:rgba(29,158,117,0.15);
+  --red:#E24B4A;--red-dark:#A32D2D;--red-light:rgba(226,75,74,0.15);
+  --amber:#EF9F27;--amber-light:rgba(239,159,39,0.15);
+  --blue:#4A90D9;--blue-light:rgba(74,144,217,0.15);
+  --gold:#c9a227;--silver:#8a9aaa;--bronze:#a0633a;
+  --bg:#0e1117;--bg2:#181e27;--bg3:#1e2636;--bg4:#242f42;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
+  --text:#f0f4f8;--text2:#8b97a8;--text3:#4a5568;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;padding-bottom:80px}
+
+/* HEADER */
+header{background:var(--bg2);border-bottom:1px solid var(--border);padding:1rem 1.25rem 0;position:sticky;top:0;z-index:100}
+.header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:1px}
+.logo span{color:var(--green)}
+.sync-row{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--text3);transition:background .3s}
+.dot.live{background:var(--green)}
+.tabs{display:flex}
+.tab{flex:1;padding:9px 4px;font-size:12px;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;border:none;background:none;color:var(--text2);border-bottom:2px solid transparent;text-align:center;transition:color .15s,border-color .15s;white-space:nowrap}
+.tab.active{color:var(--text);border-bottom-color:var(--green)}
+.tab-tv{display:none}
+@media(min-width:900px){.tab-tv{display:block}}
+
+/* MAIN */
+.main{padding:1.25rem;max-width:540px;margin:0 auto}
+.section{display:none}.section.active{display:block}
+.section-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;margin-bottom:1rem}
+
+/* CARDS */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:1rem 1.1rem;margin-bottom:12px}
+.card-label{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:10px}
+label{font-size:13px;color:var(--text2);display:block;margin-bottom:4px}
+input,textarea,select{width:100%;padding:10px 12px;font-size:15px;font-family:'DM Sans',sans-serif;border:1px solid var(--border2);border-radius:10px;background:var(--bg3);color:var(--text);outline:none;transition:border-color .15s}
+input:focus,textarea:focus,select:focus{border-color:var(--green)}
+textarea{resize:vertical;min-height:60px;line-height:1.5}
+select option{background:var(--bg3)}
+.field{margin-bottom:12px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* BUTTONS */
+.btn{padding:10px 16px;border:1px solid var(--border2);border-radius:10px;background:var(--bg3);color:var(--text);cursor:pointer;font-size:14px;font-family:'DM Sans',sans-serif;font-weight:500;transition:background .15s}
+.btn:hover{background:var(--bg4)}
+.btn-primary{background:var(--green);color:#fff;border-color:var(--green-dark)}
+.btn-primary:hover{background:var(--green-dark)}
+.btn-red{background:var(--red);color:#fff;border-color:var(--red-dark)}
+.btn-red:hover{background:var(--red-dark)}
+.btn-full{width:100%}
+.btn-sm{padding:6px 12px;font-size:13px;border-radius:8px}
+
+/* BET CATALOG */
+.cat-section{margin-bottom:16px}
+.cat-header{font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);padding:6px 0;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.bet-item{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;margin-bottom:6px;cursor:pointer;transition:border-color .15s,background .15s;gap:10px}
+.bet-item:hover{border-color:var(--green);background:var(--bg3)}
+.bet-item.already-placed{opacity:.45;pointer-events:none}
+.bet-item-text{flex:1;font-size:14px;line-height:1.4}
+.bet-item-odds{display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex-shrink:0}
+.odds-badge{background:var(--amber-light);color:var(--amber);padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;white-space:nowrap}
+.sips-hint{font-size:11px;color:var(--text3);text-align:right}
+
+/* BADGES */
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600}
+.badge-open{background:var(--green-light);color:#4ecfa0}
+
+/* AVATARS */
+.avatar{width:44px;height:44px;border-radius:50%;border:2px solid var(--border2);background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;overflow:hidden;flex-shrink:0;color:var(--text)}
+.avatar img{width:100%;height:100%;object-fit:cover}
+.avatar-upload{position:relative;cursor:pointer}
+.avatar-upload input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.avatar-edit{position:absolute;bottom:0;right:0;background:var(--green);color:#fff;width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px}
+
+/* PLAYER ROWS */
+.player-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+.player-row:last-child{border-bottom:none}
+
+/* BET CARDS */
+.bet-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:1rem 1.1rem;margin-bottom:10px}
+.sip-badge{background:var(--amber-light);color:var(--amber);padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600}
+
+/* SCORE */
+.score-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:16px}
+.score-row{display:flex;align-items:center;padding:12px 1.1rem;border-bottom:1px solid var(--border)}
+.score-row:last-child{border-bottom:none}
+
+/* TIPPING */
+.hub-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px}
+.hub-btn{padding:12px 8px;border:1px solid var(--border2);border-radius:10px;background:var(--bg3);color:var(--text);cursor:pointer;font-size:15px;font-weight:600;text-align:center;transition:all .15s}
+.hub-btn.selected{border-color:var(--green);background:var(--green-light);color:#4ecfa0}
+.score-inp-row{display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:12px}
+.score-inp-row input{width:64px;text-align:center;font-size:22px;font-weight:600;padding:10px 6px}
+.bonus-opt{padding:7px 14px;border:1px solid var(--border2);border-radius:20px;background:var(--bg3);color:var(--text2);cursor:pointer;font-size:13px;transition:all .15s;display:inline-block;margin:3px}
+.bonus-opt.selected{border-color:var(--blue);background:var(--blue-light);color:#79b4f0}
+
+/* LIVE BOX */
+.live-box{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;padding:1rem;margin-bottom:12px;text-align:center}
+.live-score-big{font-family:'Bebas Neue',sans-serif;font-size:42px;letter-spacing:2px;line-height:1}
+.live-badge{display:inline-block;background:var(--red);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* HISTORY */
+.history-item{font-size:13px;color:var(--text2);padding:5px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.history-item:last-child{border-bottom:none}
+.empty{color:var(--text3);font-size:15px;text-align:center;padding:2.5rem 0}
+
+/* CELEBRATION OVERLAY */
+#celebration{position:fixed;inset:0;z-index:600;display:none;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,0.85);pointer-events:none}
+#celebration.show{display:flex;animation:celebFadeIn .3s ease}
+@keyframes celebFadeIn{from{opacity:0}to{opacity:1}}
+.celeb-emoji{font-size:100px;animation:celebBounce .6s ease infinite alternate;line-height:1}
+@keyframes celebBounce{from{transform:scale(1) rotate(-5deg)}to{transform:scale(1.2) rotate(5deg)}}
+.celeb-title{font-family:'Bebas Neue',sans-serif;font-size:80px;letter-spacing:4px;color:#fff;text-shadow:0 0 40px var(--green);margin:12px 0 8px;line-height:1}
+.celeb-desc{font-size:22px;color:#fff;opacity:.85;text-align:center;max-width:600px;padding:0 2rem}
+.celeb-placer{font-size:18px;color:var(--amber);margin-top:10px;font-weight:600}
+.celeb-payout{font-family:'Bebas Neue',sans-serif;font-size:48px;color:var(--green);letter-spacing:2px;margin-top:8px}
+.confetti{position:absolute;width:10px;height:10px;border-radius:2px;animation:confettiFall linear forwards}
+@keyframes confettiFall{0%{transform:translateY(-20px) rotate(0deg);opacity:1}100%{transform:translateY(100vh) rotate(720deg);opacity:0}}
+
+/* TOAST */
+#toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:12px 22px;border-radius:30px;font-size:14px;z-index:999;max-width:90vw;text-align:center;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap}
+
+/* ═══════════════════ TV VIEW ═══════════════════ */
+#tab-tv{display:none}
+#tab-tv.active{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto;gap:16px;max-width:1400px;margin:0 auto;padding:1.5rem}
+@media(min-width:900px){#tab-tv.active{display:grid}}
+
+.tv-card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:1.25rem;overflow:hidden}
+.tv-title{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;color:var(--text2);margin-bottom:1rem}
+
+/* PODIUM */
+.podium-wrap{grid-column:1/3;display:flex;flex-direction:column;align-items:center;background:linear-gradient(180deg,#0e1117 0%,#181e27 100%);border-radius:16px;padding:2rem 1rem 0;overflow:hidden;border:1px solid var(--border)}
+.podium-headline{font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:3px;margin-bottom:1.5rem}
+.podium-headline span{color:var(--green)}
+.podium-stage{display:flex;align-items:flex-end;justify-content:center;gap:0;width:100%;max-width:700px}
+.podium-spot{display:flex;flex-direction:column;align-items:center;flex:1}
+
+/* MII FIGURE */
+.mii-wrap{display:flex;flex-direction:column;align-items:center;margin-bottom:8px}
+.mii-head-wrap{position:relative}
+.mii-crown{position:absolute;top:-22px;left:50%;transform:translateX(-50%);font-size:20px;z-index:3}
+.mii-face{border-radius:50%;overflow:hidden;border:3px solid #fff;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--text);position:relative;z-index:2}
+.mii-neck{width:14px;height:10px;background:#c8956c;margin:0 auto}
+.mii-body{border-radius:22px 22px 8px 8px;position:relative;display:flex;align-items:flex-start;justify-content:center;padding-top:8px;margin:0 auto}
+.mii-arms-l,.mii-arms-r{position:absolute;top:10px;width:18px;height:13px;border-radius:7px}
+.mii-arms-l{left:-15px}
+.mii-arms-r{right:-15px}
+.mii-legs{display:flex;gap:5px;justify-content:center}
+.mii-leg{border-radius:0 0 7px 7px}
+
+/* SPOT SIZES */
+.spot-1 .mii-face{width:66px;height:66px;font-size:28px;border-color:gold;border-width:3px}
+.spot-2 .mii-face,.spot-3 .mii-face{width:52px;height:52px;font-size:22px}
+.spot-1 .mii-body{width:52px;height:60px}
+.spot-2 .mii-body,.spot-3 .mii-body{width:44px;height:52px}
+.spot-1 .mii-leg{width:14px;height:26px}
+.spot-2 .mii-leg,.spot-3 .mii-leg{width:12px;height:22px}
+
+/* SPOT COLORS */
+.spot-1 .mii-body{background:#1D9E75}.spot-1 .mii-arms-l,.spot-1 .mii-arms-r{background:#0F6E56}.spot-1 .mii-leg{background:#063d2e}
+.spot-2 .mii-body{background:#4A90D9}.spot-2 .mii-arms-l,.spot-2 .mii-arms-r{background:#3070b5}.spot-2 .mii-leg{background:#1a4a80}
+.spot-3 .mii-body{background:#9b59b6}.spot-3 .mii-arms-l,.spot-3 .mii-arms-r{background:#7d3f9a}.spot-3 .mii-leg{background:#5a2d70}
+
+/* PODIUM BLOCKS */
+.podium-block{width:100%;border-radius:8px 8px 0 0;display:flex;align-items:center;justify-content:center;padding-bottom:12px}
+.spot-1 .podium-block{background:var(--gold);height:140px}
+.spot-2 .podium-block{background:var(--silver);height:105px}
+.spot-3 .podium-block{background:var(--bronze);height:80px}
+.podium-num{font-family:'Bebas Neue',sans-serif;font-size:32px}
+.spot-1 .podium-num{color:#7a5c00}
+.spot-2 .podium-num{color:#3a4a55}
+.spot-3 .podium-num{color:#5a2e10}
+.mii-label{font-size:13px;font-weight:600;text-align:center;margin-top:6px;max-width:100px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mii-pts{font-size:12px;color:var(--text2);text-align:center}
+.spot-1 .mii-pts{color:var(--amber);font-weight:600;font-size:13px}
+
+/* MII ANIMATIONS */
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes sway{0%,100%{transform:rotate(-4deg)}50%{transform:rotate(4deg)}}
+@keyframes celebrate{0%,100%{transform:translateY(0) rotate(0)}25%{transform:translateY(-8px) rotate(-5deg)}75%{transform:translateY(-4px) rotate(5deg)}}
+.spot-1 .mii-wrap{animation:celebrate 1.2s ease-in-out infinite}
+.spot-2 .mii-wrap{animation:bounce 1.6s ease-in-out infinite}
+.spot-3 .mii-wrap{animation:sway 2s ease-in-out infinite}
+
+/* TV SCOREBOARD */
+.tv-score-row{display:flex;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)}
+.tv-score-row:last-child{border-bottom:none}
+.tv-rank{font-size:20px;width:30px;text-align:center}
+.tv-name{font-size:16px;font-weight:500;flex:1;margin-left:10px}
+.tv-val{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:1px}
+.tv-val.pos{color:var(--green)}
+.tv-val.neg{color:var(--red)}
+
+/* TV LIVE */
+.tv-live-score{font-family:'Bebas Neue',sans-serif;font-size:56px;letter-spacing:3px;text-align:center;line-height:1}
+.tv-live-teams{display:flex;justify-content:space-between;font-size:15px;color:var(--text2);margin-top:4px}
+
+/* PODIUM BREAKDOWN MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem}
+.modal-box{background:var(--bg2);border:1px solid var(--border2);border-radius:18px;padding:1.5rem;max-width:420px;width:100%;position:relative}
+.modal-close{position:absolute;top:12px;right:14px;background:none;border:none;color:var(--text2);font-size:22px;cursor:pointer;line-height:1}
+.breakdown-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)}
+.breakdown-row:last-child{border-bottom:none}
+.breakdown-label{font-size:14px;color:var(--text2)}
+.breakdown-pts{font-size:15px;font-weight:600}
+.breakdown-pts.hit{color:#4ecfa0}
+.breakdown-pts.miss{color:var(--red)}
+.breakdown-pts.pending{color:var(--amber)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-top">
+    <div class="logo">VM <span>BETTING</span> 🍺</div>
+    <div class="sync-row">
+      <span class="dot" id="sync-dot"></span>
+      <span id="sync-label">Kobler til...</span>
+    </div>
+  </div>
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('spillere')">Spillere</button>
+    <button class="tab" onclick="showTab('tipping')">Tipping</button>
+    <button class="tab" onclick="showTab('betting')">Betting</button>
+    <button class="tab" onclick="showTab('poeng')">Poeng</button>
+    <button class="tab tab-tv" onclick="showTab('tv')">📺 Storskjerm</button>
+  </div>
+</header>
+
+<div class="main" id="main-wrap">
+
+  <!-- ===== SPILLERE ===== -->
+  <div class="section active" id="tab-spillere">
+    <div class="section-title">Spillere</div>
+    <div class="card">
+      <div class="field"><label>Navn</label><input type="text" id="player-name" placeholder="f.eks. Anders" onkeydown="if(event.key==='Enter')addPlayer()"></div>
+      <button class="btn btn-primary btn-full" onclick="addPlayer()">Legg til spiller</button>
+    </div>
+    <div id="player-list"></div>
+    <div id="reset-wrap"></div>
+  </div>
+
+  <!-- ===== TIPPING ===== -->
+  <div class="section" id="tab-tipping">
+    <div class="section-title">Tipping</div>
+    <div id="live-score-box"></div>
+    <div class="card">
+      <div class="field"><label>Velg kamp</label>
+        <select id="tip-match-select" onchange="renderTipForm()">
+          <option value="">Velg kamp...</option>
+          <option value="FRA-SEN">Frankrike – Senegal</option>
+          <option value="NOR-IRQ">Norge – Irak</option>
+        </select>
+      </div>
+      <div class="field"><label>Hvem tipper?</label>
+        <select id="tip-player-select"><option value="">Velg spiller...</option></select>
+      </div>
+    </div>
+    <div id="tip-form"></div>
+  </div>
+
+  <!-- ===== BETTING ===== -->
+  <div class="section" id="tab-betting">
+    <div class="section-title">Slurke-betting</div>
+
+    <!-- Step 1: pick match -->
+    <div class="card">
+      <div class="field"><label>Velg kamp</label>
+        <select id="bet-match-sel" onchange="renderBetCatalog()">
+          <option value="">Velg kamp...</option>
+          <option value="FRA-SEN">Frankrike – Senegal</option>
+          <option value="NOR-IRQ">Norge – Irak</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Bet catalog -->
+    <div id="bet-catalog"></div>
+
+    <!-- Bet placement modal (inline) -->
+    <div id="bet-place-panel" style="display:none">
+      <div class="card" style="border-color:var(--green)">
+        <div class="card-label">Legg inn bet</div>
+        <div id="bet-place-desc" style="font-size:16px;font-weight:500;margin-bottom:4px"></div>
+        <div id="bet-place-odds" style="font-size:13px;color:var(--amber);margin-bottom:14px"></div>
+        <div class="field"><label>Hvem vedder?</label>
+          <select id="bet-placer-sel"><option value="">Velg spiller...</option></select>
+        </div>
+        <div class="field"><label>Innsats (slurker du drikker NÅ)</label>
+          <input type="number" id="bet-stake" min="1" max="20" value="2">
+        </div>
+        <div id="bet-payout-preview" style="font-size:13px;color:var(--text2);margin-bottom:12px"></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary" style="flex:1" onclick="confirmBet()">Drikk & plasser 🍺</button>
+          <button class="btn" onclick="cancelBet()">Avbryt</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-top:1.5rem">Aktive bets</div>
+    <div id="bets-list"></div>
+  </div>
+
+  <!-- ===== POENG ===== -->
+  <div class="section" id="tab-poeng">
+    <div class="section-title">Poengtavle</div>
+    <div id="scoreboard"></div>
+    <div id="history-section"></div>
+  </div>
+
+  <!-- ===== TV ===== -->
+  <div class="section" id="tab-tv">
+
+    <!-- PODIUM (full width) -->
+    <div class="podium-wrap tv-card" id="tv-podium">
+      <div class="podium-headline">VM <span>BETTING</span> 🏆</div>
+      <div class="podium-stage" id="podium-stage"></div>
+    </div>
+
+    <!-- SCORE + LIVE side by side -->
+    <div class="tv-card" id="tv-score-card">
+      <div class="tv-title">POENGTAVLE</div>
+      <div id="tv-scoreboard"></div>
+    </div>
+
+    <div class="tv-card" id="tv-live-card">
+      <div class="tv-title">LIVE SCORE</div>
+      <div id="tv-live"></div>
+    </div>
+
+    <!-- BETS full width -->
+    <div class="tv-card" style="grid-column:1/3" id="tv-bets-card">
+      <div class="tv-title">AKTIVE VEDDEMÅL 🍺</div>
+      <div id="tv-bets"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<div id="celebration">
+  <div class="celeb-emoji" id="celeb-emoji">🎉</div>
+  <div class="celeb-title" id="celeb-title">TREFFER!</div>
+  <div class="celeb-desc" id="celeb-desc"></div>
+  <div class="celeb-placer" id="celeb-placer"></div>
+  <div class="celeb-payout" id="celeb-payout"></div>
+</div>
+<div id="modal-overlay" class="modal-overlay" style="display:none" onclick="closeModal(event)">
+  <div class="modal-box" id="modal-box">
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <div id="modal-content"></div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase, ref, onValue, set, push, update, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyD5lE-c5gZrosPDxnUpEc2MalMawX4lN4U",
+  authDomain: "vmbetting-9eaff.firebaseapp.com",
+  databaseURL: "https://vmbetting-9eaff-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "vmbetting-9eaff",
+  storageBucket: "vmbetting-9eaff.firebasestorage.app",
+  messagingSenderId: "349618378088",
+  appId: "1:349618378088:web:be7d64cb173c5a833772dd"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const RAPID_KEY = "86b71ea67bmsh076351ff0c7fb59p12fb39jsnb660034bd93f";
+
+const MATCHES = {
+  "FRA-SEN":{ label:"Frankrike – Senegal", home:"Frankrike", away:"Senegal", fixtureId:null },
+  "NOR-IRQ":{ label:"Norge – Irak", home:"Norge", away:"Irak", fixtureId:null }
+};
+
+let players={}, bets={}, tips={};
+let selectedBettors=new Set();
+let currentTab='spillere';
+let liveScores={};
+let tipForm={ hub:null, homeGoals:'', awayGoals:'', firstScorer:null, redCard:null, firstHalfGoal:null };
+let toastTimer;
+
+function isAdmin(){ return window.innerWidth>=900; }
+
+// ─── FIREBASE ───
+onValue(ref(db,'players'), s=>{ players=s.val()||{}; setSync(true); renderPlayers(); renderBettorSelect(); renderPlayerSelects(); if(currentTab==='poeng')renderScore(); if(currentTab==='tv')renderTV(); });
+onValue(ref(db,'bets'), s=>{ bets=s.val()||{}; if(currentTab==='betting')renderBets(); if(currentTab==='tv')renderTV(); });
+onValue(ref(db,'tips'), s=>{ tips=s.val()||{}; if(currentTab==='poeng')renderScore(); if(currentTab==='tv')renderTV(); });
+
+function setSync(live){ document.getElementById('sync-dot').className='dot'+(live?' live':''); document.getElementById('sync-label').textContent=live?'Live':'Kobler til...'; }
+
+// ─── TABS ───
+window.showTab=function(id){
+  currentTab=id;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  ['spillere','tipping','betting','poeng','tv'].forEach((t,i)=>{ const el=document.querySelectorAll('.tab')[i]; if(el)el.classList.toggle('active',t===id); });
+  const mw=document.getElementById('main-wrap');
+  if(id==='tv'){ mw.style.maxWidth='none'; mw.style.padding='0'; }
+  else{ mw.style.maxWidth=''; mw.style.padding=''; }
+  if(id==='tipping'){ renderPlayerSelects(); renderLiveBox(); }
+  if(id==='betting'){ renderBets(); renderBetCatalog(); }
+  if(id==='poeng')renderScore();
+  if(id==='tv')renderTV();
+};
+
+// ─── PLAYERS ───
+window.addPlayer=function(){
+  const inp=document.getElementById('player-name');
+  const name=inp.value.trim(); if(!name)return;
+  if(Object.values(players).some(p=>p.name===name)){ showToast('Finnes allerede!'); return; }
+  push(ref(db,'players'),{ name, tipPoints:0, sipScore:0, avatar:null });
+  inp.value=''; inp.focus();
+};
+window.removePlayer=function(id){ if(confirm('Fjern?'))remove(ref(db,'players/'+id)); };
+window.uploadAvatar=function(id,input){
+  const file=input.files[0]; if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{
+      const canvas=document.createElement('canvas');
+      const SIZE=256;
+      canvas.width=SIZE; canvas.height=SIZE;
+      const ctx=canvas.getContext('2d');
+
+      // Crop to square from center
+      const s=Math.min(img.width,img.height);
+      const sx=(img.width-s)/2;
+      const sy=(img.height-s)/2;
+
+      // Mii-style distortion: stretch width ~115%, squish top, enlarge eyes zone
+      ctx.save();
+      // Draw base square crop
+      ctx.drawImage(img, sx, sy, s, s, 0, 0, SIZE, SIZE);
+      ctx.restore();
+
+      // Apply a subtle horizontal stretch using a second canvas pass
+      const canvas2=document.createElement('canvas');
+      canvas2.width=SIZE; canvas2.height=SIZE;
+      const ctx2=canvas2.getContext('2d');
+
+      // Clip to circle for the avatar
+      ctx2.beginPath();
+      ctx2.arc(SIZE/2, SIZE/2, SIZE/2, 0, Math.PI*2);
+      ctx2.clip();
+
+      // Mii-style: wide face, big forehead, squished chin
+      ctx2.transform(1.28, 0, 0, 0.88, -SIZE*0.14, SIZE*0.06);
+      ctx2.drawImage(canvas, 0, 0, SIZE, SIZE);
+
+      const result=canvas2.toDataURL('image/jpeg', 0.82);
+      update(ref(db,'players/'+id),{avatar:result});
+      showToast('Avatar oppdatert! 📸');
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+};
+window.resetAll=function(){ if(!confirm('Sletter alt. Sikker?'))return; remove(ref(db,'players')); remove(ref(db,'bets')); remove(ref(db,'tips')); showToast('Nullstilt 🗑️'); };
+
+function avatarEl(p, id, editable=false){
+  const hasImg=p&&p.avatar&&p.avatar.startsWith('data:');
+  const inner=hasImg?`<img src="${p.avatar}" alt="${p.name}">`:`<span>${(p&&p.name)?p.name.charAt(0).toUpperCase():'?'}</span>`;
+  if(!editable)return`<div class="avatar">${inner}</div>`;
+  return`<div class="avatar avatar-upload">${inner}<div class="avatar-edit">✎</div><input type="file" accept="image/*" capture="user" onchange="uploadAvatar('${id}',this)"></div>`;
+}
+
+function renderPlayers(){
+  const el=document.getElementById('player-list');
+  const list=Object.entries(players);
+  if(!list.length){ el.innerHTML='<div class="empty">Ingen spillere enda</div>'; return; }
+  el.innerHTML='<div class="card">'+list.map(([id,p])=>`
+    <div class="player-row">
+      ${avatarEl(p,id,true)}
+      <div style="flex:1"><div style="font-size:15px;font-weight:500">${p.name}</div><div style="font-size:12px;color:var(--text2)">Trykk på avatar for bilde 📸</div></div>
+      ${isAdmin()?`<button class="btn btn-sm" style="color:var(--red)" onclick="removePlayer('${id}')">×</button>`:''}
+    </div>`).join('')+'</div>';
+  document.getElementById('reset-wrap').innerHTML=isAdmin()?`<button class="btn btn-sm btn-full" style="color:var(--red);border-color:var(--red-dark);margin-top:4px" onclick="resetAll()">🗑️ Nullstill alt</button>`:'';
+}
+
+function renderPlayerSelects(){
+  const sel=document.getElementById('tip-player-select'); if(!sel)return;
+  const cur=sel.value;
+  sel.innerHTML='<option value="">Velg spiller...</option>'+Object.entries(players).map(([id,p])=>`<option value="${id}">${p.name}</option>`).join('');
+  if(cur)sel.value=cur;
+}
+
+function renderBettorSelect(){
+  const el=document.getElementById('bettor-select'); if(!el)return;
+  const list=Object.entries(players);
+  if(!list.length){ el.innerHTML='<span style="font-size:13px;color:var(--text3)">Legg til spillere først</span>'; return; }
+  el.innerHTML=list.map(([id,p])=>`<span class="chip${selectedBettors.has(id)?' selected':''}" onclick="toggleBettor('${id}')">${p.name}</span>`).join('');
+}
+window.toggleBettor=function(id){ selectedBettors.has(id)?selectedBettors.delete(id):selectedBettors.add(id); renderBettorSelect(); };
+
+// ─── LIVE SCORE ───
+async function fetchLive(fixtureId){
+  if(!fixtureId)return null;
+  try{
+    const res=await fetch(`https://v3.football.api-sports.io/fixtures?id=${fixtureId}`,{ headers:{'x-rapidapi-key':RAPID_KEY,'x-rapidapi-host':'v3.football.api-sports.io'} });
+    const data=await res.json();
+    const fix=data.response?.[0]; if(!fix)return null;
+    return{ home:fix.teams.home.name, away:fix.teams.away.name, homeGoals:fix.goals.home??'-', awayGoals:fix.goals.away??'-', status:fix.fixture.status.short, elapsed:fix.fixture.status.elapsed, events:fix.events||[], halftime: fix.score?.halftime ? { home: fix.score.halftime.home??0, away: fix.score.halftime.away??0 } : null };
+  }catch{ return null; }
+}
+async function refreshLive(){
+  for(const[key,match]of Object.entries(MATCHES)){
+    if(match.fixtureId){ const s=await fetchLive(match.fixtureId); if(s){ liveScores[key]=s; calcLivePoints(key,s); autoResolveBets(key,s); } }
+  }
+  renderLiveBox();
+  if(currentTab==='tv')renderTVLive();
+}
+refreshLive(); setInterval(refreshLive,60000);
+
+// Calculate live/final points for all tips of a match based on current score
+function calcLivePoints(mk, score){
+  const matchTips=Object.entries(tips).filter(([,t])=>t.matchKey===mk);
+  if(!matchTips.length)return;
+  const isFinal=score.status==='FT';
+  const hg=typeof score.homeGoals==='number'?score.homeGoals:null;
+  const ag=typeof score.awayGoals==='number'?score.awayGoals:null;
+  if(hg===null||ag===null)return;
+
+  const events=score.events||[];
+  const firstGoal=events.find(e=>e.type==='Goal');
+  const hasRedCard=events.some(e=>e.type==='Card'&&e.detail==='Red Card');
+  const firstHalfGoal=events.some(e=>e.type==='Goal'&&e.time?.elapsed<=45);
+  let actualFS='N';
+  if(firstGoal){
+    const homeTeam=MATCHES[mk]?.home||'';
+    actualFS=firstGoal.team.name.toLowerCase().includes(homeTeam.toLowerCase().split(' ')[0])?'H':'A';
+  }
+  const actualHub=hg>ag?'H':hg<ag?'B':'U';
+  const actualDiff=hg-ag;
+
+  const upd={};
+  for(const[tid,t]of matchTips){
+    let pts=0;
+    // HUB — live
+    if(t.hub===actualHub)pts+=3;
+    // Målforskjell — live
+    if((t.homeGoals-t.awayGoals)===actualDiff)pts+=3;
+    // Eksakt stilling — live
+    if(t.homeGoals===hg&&t.awayGoals===ag)pts+=3;
+    // Bonuser — bare når kampen er ferdig (FT), da vet vi fasit
+    if(isFinal){
+      if(t.firstScorer===actualFS)pts+=2;
+      if((t.redCard==='Y')===hasRedCard)pts+=2;
+      if((t.firstHalfGoal==='Y')===firstHalfGoal)pts+=2;
+    }
+    upd[`tips/${tid}/livePoints`]=pts;
+    if(isFinal&&!t.resolved){
+      // Add bonus points and mark resolved
+      let bonusPts=0;
+      if(t.firstScorer===actualFS)bonusPts+=2;
+      if((t.redCard==='Y')===hasRedCard)bonusPts+=2;
+      if((t.firstHalfGoal==='Y')===firstHalfGoal)bonusPts+=2;
+      const finalPts=pts; // already includes bonus above
+      upd[`tips/${tid}/points`]=finalPts;
+      upd[`tips/${tid}/resolved`]=true;
+      upd[`players/${t.playerId}/tipPoints`]=(players[t.playerId]?.tipPoints||0)+finalPts-(t.livePoints||0);
+    }
+  }
+  if(Object.keys(upd).length) update(ref(db),upd);
+}
+
+// Helper to get current effective points for a tip (live or resolved)
+function getTipPoints(t){
+  if(t.resolved)return t.points||0;
+  return t.livePoints||0;
+}
+
+function renderLiveBox(){
+  const el=document.getElementById('live-score-box'); if(!el)return;
+  const mk=document.getElementById('tip-match-select')?.value;
+  const score=mk?liveScores[mk]:null;
+  const match=mk?MATCHES[mk]:null;
+  if(!score||!match){ el.innerHTML=match?`<div class="live-box"><div style="color:var(--text3);font-size:14px">Ingen live data for ${match.label}</div></div>`:''; return; }
+  const isLive=['1H','HT','2H','ET','P'].includes(score.status);
+  el.innerHTML=`<div class="live-box"><div style="font-size:12px;color:var(--text2);margin-bottom:6px">${isLive?'<span class="live-badge">LIVE</span>':score.status==='FT'?'✅ Ferdig':''} ${score.elapsed?score.elapsed+"'":''}
+  </div><div class="live-score-big">${score.homeGoals} – ${score.awayGoals}</div><div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text2);margin-top:6px"><span>${match.home}</span><span>${match.away}</span></div></div>`;
+}
+
+// ─── TIPPING ───
+window.renderTipForm=function(){
+  const mk=document.getElementById('tip-match-select').value;
+  renderLiveBox();
+  const el=document.getElementById('tip-form'); if(!mk){ el.innerHTML=''; return; }
+  const match=MATCHES[mk];
+  tipForm={hub:null,homeGoals:'',awayGoals:'',firstScorer:null,redCard:null,firstHalfGoal:null};
+  el.innerHTML=`
+    <div class="card"><div class="card-label">Utfall — 3 poeng</div>
+      <div class="hub-row">
+        <div class="hub-btn" id="hub-H" onclick="selHub('H')">H<br><small style="font-size:11px;color:var(--text2)">${match.home}</small></div>
+        <div class="hub-btn" id="hub-U" onclick="selHub('U')">U<br><small style="font-size:11px;color:var(--text2)">Uavgjort</small></div>
+        <div class="hub-btn" id="hub-B" onclick="selHub('B')">B<br><small style="font-size:11px;color:var(--text2)">${match.away}</small></div>
+      </div></div>
+    <div class="card"><div class="card-label">Stilling — maks 6 poeng</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Rett målforskjell +3p · Eksakt stilling +3p ekstra</div>
+      <div class="score-inp-row">
+        <input type="number" id="tip-hg" min="0" max="20" placeholder="0">
+        <span style="font-size:22px;font-weight:700;color:var(--text2)">–</span>
+        <input type="number" id="tip-ag" min="0" max="20" placeholder="0">
+      </div>
+      <div style="text-align:center;font-size:12px;color:var(--text2)">${match.home} – ${match.away}</div></div>
+    <div class="card"><div class="card-label">Bonusspørsmål — 2 poeng hver</div>
+      <div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:6px">⚽ Første lag som scorer</div>
+      <div style="margin-bottom:12px">
+        <span class="bonus-opt" id="fs-H" onclick="selBonus('firstScorer','H',this)">${match.home}</span>
+        <span class="bonus-opt" id="fs-A" onclick="selBonus('firstScorer','A',this)">${match.away}</span>
+        <span class="bonus-opt" id="fs-N" onclick="selBonus('firstScorer','N',this)">Ingen mål</span>
+      </div>
+      <div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:6px">🔴 Rødt kort?</div>
+      <div style="margin-bottom:12px">
+        <span class="bonus-opt" id="rc-Y" onclick="selBonus('redCard','Y',this)">Ja</span>
+        <span class="bonus-opt" id="rc-N" onclick="selBonus('redCard','N',this)">Nei</span>
+      </div>
+      <div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:6px">⏱️ Mål i 1. omgang?</div>
+      <div>
+        <span class="bonus-opt" id="fhg-Y" onclick="selBonus('firstHalfGoal','Y',this)">Ja</span>
+        <span class="bonus-opt" id="fhg-N" onclick="selBonus('firstHalfGoal','N',this)">Nei</span>
+      </div></div>
+    <button class="btn btn-primary btn-full" onclick="submitTip('${mk}')">Send inn tipp 🎯</button>
+    <div id="tip-status" style="margin-top:10px"></div>`;
+};
+window.selHub=function(v){ tipForm.hub=v; ['H','U','B'].forEach(x=>document.getElementById('hub-'+x)?.classList.toggle('selected',x===v)); };
+window.selBonus=function(field,val,el){ tipForm[field]=val; const pfx={firstScorer:'fs',redCard:'rc',firstHalfGoal:'fhg'}[field]; document.querySelectorAll(`[id^="${pfx}-"]`).forEach(e=>e.classList.remove('selected')); el.classList.add('selected'); };
+window.submitTip=function(mk){
+  const pid=document.getElementById('tip-player-select').value;
+  const hgVal=document.getElementById('tip-hg')?.value;
+  const agVal=document.getElementById('tip-ag')?.value;
+  if(!pid){ showToast('Velg spiller!'); return; }
+  if(!tipForm.hub){ showToast('Velg utfall!'); return; }
+  if(hgVal===''||hgVal===null||hgVal===undefined||agVal===''||agVal===null||agVal===undefined){ showToast('Fyll inn stilling!'); return; }
+  if(!tipForm.firstScorer||!tipForm.redCard||!tipForm.firstHalfGoal){ showToast('Svar på alle bonus!'); return; }
+  const existing=Object.keys(tips).find(k=>tips[k].playerId===pid&&tips[k].matchKey===mk);
+  const data={ playerId:pid, playerName:players[pid]?.name||'', matchKey:mk, matchLabel:MATCHES[mk]?.label||mk,
+    hub:tipForm.hub, homeGoals:parseInt(hgVal), awayGoals:parseInt(agVal),
+    firstScorer:tipForm.firstScorer, redCard:tipForm.redCard, firstHalfGoal:tipForm.firstHalfGoal,
+    points:null, resolved:false, createdAt:Date.now() };
+  if(existing){ update(ref(db,'tips/'+existing),data); showToast('Tipp oppdatert! 🎯'); }
+  else{ push(ref(db,'tips'),data); showToast('Tipp registrert! 🎯'); }
+  document.getElementById('tip-status').innerHTML=`<div class="card" style="text-align:center;padding:.75rem"><div style="color:#4ecfa0;font-weight:500">✅ Registrert!</div><div style="font-size:13px;color:var(--text2);margin-top:4px">${MATCHES[mk].home} ${data.homeGoals}–${data.awayGoals} ${MATCHES[mk].away} (${data.hub})</div></div>`;
+};
+// ─── BET CATALOG ───
+// ─── BET CATALOG WITH RESOLVERS ───
+// resolve(score, events, htScore) returns true=win, false=lose, null=not yet decidable
+const BET_CATALOG = {
+  "FRA-SEN": {
+    home:"Frankrike", away:"Senegal",
+    homeKey:"france", awayKey:"senegal",
+    categories:[
+      { icon:"⚽", label:"Mål", bets:[
+        { id:"fs-mbappe",    text:"Mbappé scorer i kampen",           odds:1.8, apiName:"Mbappe",   resolve:(s,ev)=>playerScored(ev,"Mbappe") },
+        { id:"fs-dembele",   text:"Dembélé scorer i kampen",          odds:2.5, apiName:"Dembele",  resolve:(s,ev)=>playerScored(ev,"Dembele") },
+        { id:"fs-olise",     text:"Olise scorer i kampen",            odds:3.0, apiName:"Olise",    resolve:(s,ev)=>playerScored(ev,"Olise") },
+        { id:"fs-thuram",    text:"Thuram scorer i kampen",           odds:3.5, apiName:"Thuram",   resolve:(s,ev)=>playerScored(ev,"Thuram") },
+        { id:"fs-sarr",      text:"Ismaila Sarr scorer i kampen",     odds:3.5, apiName:"Sarr",     resolve:(s,ev)=>playerScored(ev,"Sarr") },
+        { id:"fs-diatta",    text:"Diatta scorer for Senegal",        odds:4.0, apiName:"Diatta",   resolve:(s,ev)=>playerScored(ev,"Diatta") },
+        { id:"fs-jakobs",    text:"Jakobs scorer for Senegal",        odds:7.0, apiName:"Jakobs",   resolve:(s,ev)=>playerScored(ev,"Jakobs") },
+        { id:"fg-fra",       text:"Frankrike scorer først",           odds:1.5, resolve:(s,ev,ht,fin)=>firstScorerTeam(ev,"france",fin) },
+        { id:"fg-sen",       text:"Senegal scorer først",             odds:4.0, resolve:(s,ev,ht,fin)=>firstScorerTeam(ev,"senegal",fin) },
+        { id:"fg-15",        text:"Mål innen de første 15 min",       odds:2.5, resolve:(s,ev,ht,fin)=>goalBefore(ev,16,fin) },
+        { id:"o25",          text:"Over 2,5 mål totalt",              odds:1.8, resolve:(s,ev,ht,fin)=>overGoals(s,2.5,fin) },
+        { id:"o45",          text:"Over 4,5 mål totalt",              odds:3.5, resolve:(s,ev,ht,fin)=>overGoals(s,4.5,fin) },
+        { id:"btts",         text:"Begge lag scorer",                 odds:2.2, resolve:(s,ev,ht,fin)=>bothTeamsScored(s,fin) },
+        { id:"cleanfra",     text:"Frankrike holder nullen",          odds:2.0, resolve:(s,ev,ht,fin)=>fin?s.awayGoals===0:null },
+        { id:"cleansen",     text:"Senegal holder nullen",            odds:5.0, resolve:(s,ev,ht,fin)=>fin?s.homeGoals===0:null },
+        { id:"hattrick",     text:"Mbappé hattrick",                  odds:8.0, resolve:(s,ev,ht,fin)=>playerHattrick(ev,"Mbappe",fin) },
+      ]},
+      { icon:"🟨", label:"Kort & disiplin", bets:[
+        { id:"rc-any",       text:"Rødt kort i kampen",               odds:3.5, resolve:(s,ev,ht,fin)=>hasCard(ev,"Red Card",fin) },
+        { id:"yc-o3",        text:"Over 3 gule kort totalt",          odds:2.0, resolve:(s,ev,ht,fin)=>overCards(ev,"Yellow Card",3,fin) },
+        { id:"yc-o5",        text:"Over 5 gule kort totalt",          odds:4.0, resolve:(s,ev,ht,fin)=>overCards(ev,"Yellow Card",5,fin) },
+        { id:"pen-any",      text:"Straffespark i kampen",            odds:3.0, resolve:(s,ev,ht,fin)=>hasPenalty(ev,fin) },
+        { id:"pen-scored",   text:"Straffespark blir scoret",         odds:3.5, resolve:(s,ev,ht,fin)=>penaltyScored(ev,fin) },
+        { id:"pen-miss",     text:"Straffespark blir brent",          odds:9.0, resolve:(s,ev,ht,fin)=>penaltyMissed(ev,fin) },
+      ]},
+      { icon:"⏱️", label:"Omganger", bets:[
+        { id:"h1-goal",      text:"Mål i 1. omgang",                  odds:1.6, resolve:(s,ev,ht)=>ht?(ht.home+ht.away)>0:null },
+        { id:"h1-nogoal",    text:"Ingen mål i 1. omgang",            odds:2.8, resolve:(s,ev,ht)=>ht?(ht.home+ht.away)===0:null },
+        { id:"h1-fra",       text:"Frankrike leder til pause",        odds:1.8, resolve:(s,ev,ht)=>ht?ht.home>ht.away:null },
+        { id:"h1-sen",       text:"Senegal leder til pause",          odds:5.0, resolve:(s,ev,ht)=>ht?ht.away>ht.home:null },
+        { id:"h2-more",      text:"Flest mål i 2. omgang",            odds:1.8, resolve:(s,ev,ht,fin)=>fin&&ht?((s.homeGoals+s.awayGoals)-(ht.home+ht.away))>(ht.home+ht.away):null },
+        { id:"sub5",         text:"Totalt 5 eller flere bytter",      odds:1.6, resolve:(s,ev,ht,fin)=>fin?countSubs(ev)>=5:countSubs(ev)>=5?true:null },
+      ]},
+      { icon:"🎯", label:"Eksakt sluttresultat", bets:[
+        { id:"res-10", text:"1–0 til Frankrike", odds:5.0, resolve:(s,ev,ht,fin)=>fin?s.homeGoals===1&&s.awayGoals===0:null },
+        { id:"res-20", text:"2–0 til Frankrike", odds:5.5, resolve:(s,ev,ht,fin)=>fin?s.homeGoals===2&&s.awayGoals===0:null },
+        { id:"res-21", text:"2–1 til Frankrike", odds:6.0, resolve:(s,ev,ht,fin)=>fin?s.homeGoals===2&&s.awayGoals===1:null },
+        { id:"res-30", text:"3–0 til Frankrike", odds:7.0, resolve:(s,ev,ht,fin)=>fin?s.homeGoals===3&&s.awayGoals===0:null },
+        { id:"res-31", text:"3–1 til Frankrike", odds:8.0, resolve:(s,ev,ht,fin)=>fin?s.homeGoals===3&&s.awayGoals===1:null },
+        { id:"res-00", text:"0–0 uavgjort",       odds:9.0, resolve:(s,ev,ht,fin)=>fin?s.homeGoals===0&&s.awayGoals===0:null },
+        { id:"res-11", text:"1–1 uavgjort",       odds:7.0, resolve:(s,ev,ht,fin)=>fin?s.homeGoals===1&&s.awayGoals===1:null },
+        { id:"res-01", text:"0–1 til Senegal",    odds:9.0, resolve:(s,ev,ht,fin)=>fin?s.homeGoals===0&&s.awayGoals===1:null },
+        { id:"res-02", text:"0–2 til Senegal",    odds:12.0,resolve:(s,ev,ht,fin)=>fin?s.homeGoals===0&&s.awayGoals===2:null },
+      ]},
+      { icon:"🌟", label:"Spesial", bets:[
+        { id:"yc-mbappe",    text:"Mbappé får gult kort",             odds:5.0, resolve:(s,ev,ht,fin)=>playerCard(ev,"Mbappe","Yellow Card",fin) },
+        { id:"owngoal",      text:"Selvmål i kampen",                 odds:6.0, resolve:(s,ev,ht,fin)=>hasOwnGoal(ev,fin) },
+        { id:"mbappe-assist",text:"Mbappé gir målgivende pasning",    odds:2.5, resolve:(s,ev,ht,fin)=>playerAssist(ev,"Mbappe",fin) },
+        { id:"sub-mbappe",   text:"Mbappé byttes ut",                 odds:3.0, resolve:(s,ev,ht,fin)=>playerSubbedOff(ev,"Mbappe",fin) },
+        { id:"sen-lead",     text:"Senegal leder på noe tidspunkt",   odds:4.0, resolve:(s,ev,ht,fin)=>senegalLedAtSomePoint(ev,fin) },
+      ]},
+    ]
+  },
+  "NOR-IRQ": {
+    home:"Norge", away:"Irak",
+    homeKey:"norway", awayKey:"iraq",
+    categories:[
+      { icon:"⚽", label:"Mål", bets:[
+        { id:"ni-haaland",   text:"Haaland scorer i kampen",          odds:1.4, resolve:(s,ev)=>playerScored(ev,"Haaland") },
+        { id:"ni-sorloth",   text:"Sørloth scorer i kampen",          odds:3.0, resolve:(s,ev)=>playerScored(ev,"Sorloth","Sørloth") },
+        { id:"ni-odegaard",  text:"Ødegaard scorer i kampen",         odds:4.0, resolve:(s,ev)=>playerScored(ev,"Odegaard","Ødegaard") },
+        { id:"ni-nusa",      text:"Nusa scorer i kampen",             odds:5.0, resolve:(s,ev)=>playerScored(ev,"Nusa") },
+        { id:"ni-bobb",      text:"Bobb scorer i kampen",             odds:6.0, resolve:(s,ev)=>playerScored(ev,"Bobb") },
+        { id:"ni-ryerson",   text:"Ryerson scorer",                   odds:8.0, resolve:(s,ev)=>playerScored(ev,"Ryerson") },
+        { id:"ni-iraq-any",  text:"Irak scorer i kampen",             odds:4.5, resolve:(s,ev,ht,fin)=>teamScored(s,ev,"iraq",fin) },
+        { id:"ni-fg-nor",    text:"Norge scorer først",               odds:1.3, resolve:(s,ev,ht,fin)=>firstScorerTeam(ev,"norway",fin) },
+        { id:"ni-fg-irq",    text:"Irak scorer først",                odds:6.0, resolve:(s,ev,ht,fin)=>firstScorerTeam(ev,"iraq",fin) },
+        { id:"ni-fg-15",     text:"Mål innen de første 15 min",       odds:2.0, resolve:(s,ev,ht,fin)=>goalBefore(ev,16,fin) },
+        { id:"ni-o35",       text:"Over 3,5 mål totalt",              odds:1.8, resolve:(s,ev,ht,fin)=>overGoals(s,3.5,fin) },
+        { id:"ni-o55",       text:"Over 5,5 mål totalt",              odds:3.0, resolve:(s,ev,ht,fin)=>overGoals(s,5.5,fin) },
+        { id:"ni-haat2",     text:"Haaland scorer 2+",                odds:2.5, resolve:(s,ev,ht,fin)=>playerGoalCount(ev,"Haaland",2,fin) },
+        { id:"ni-haat3",     text:"Haaland hattrick",                 odds:4.5, resolve:(s,ev,ht,fin)=>playerHattrick(ev,"Haaland",fin) },
+        { id:"ni-clean",     text:"Norge holder nullen",              odds:1.8, resolve:(s,ev,ht,fin)=>fin?s.awayGoals===0:null },
+        { id:"ni-btts",      text:"Begge lag scorer",                 odds:3.5, resolve:(s,ev,ht,fin)=>bothTeamsScored(s,fin) },
+      ]},
+      { icon:"🟨", label:"Kort & disiplin", bets:[
+        { id:"ni-rc",        text:"Rødt kort i kampen",               odds:4.0, resolve:(s,ev,ht,fin)=>hasCard(ev,"Red Card",fin) },
+        { id:"ni-yc3",       text:"Over 3 gule kort totalt",          odds:2.5, resolve:(s,ev,ht,fin)=>overCards(ev,"Yellow Card",3,fin) },
+        { id:"ni-pen",       text:"Straffespark i kampen",            odds:3.5, resolve:(s,ev,ht,fin)=>hasPenalty(ev,fin) },
+        { id:"ni-pen-haal",  text:"Haaland tar straffespark",         odds:4.0, resolve:(s,ev,ht,fin)=>playerPenalty(ev,"Haaland",fin) },
+      ]},
+      { icon:"⏱️", label:"Omganger", bets:[
+        { id:"ni-h1goal",    text:"Mål i 1. omgang",                  odds:1.4, resolve:(s,ev,ht)=>ht?(ht.home+ht.away)>0:null },
+        { id:"ni-h1nor",     text:"Norge leder til pause",            odds:1.5, resolve:(s,ev,ht)=>ht?ht.home>ht.away:null },
+        { id:"ni-h1-2plus",  text:"2+ mål i 1. omgang",              odds:2.0, resolve:(s,ev,ht)=>ht?(ht.home+ht.away)>=2:null },
+        { id:"ni-h2more",    text:"Flest mål i 2. omgang",            odds:2.0, resolve:(s,ev,ht,fin)=>fin&&ht?((s.homeGoals+s.awayGoals)-(ht.home+ht.away))>(ht.home+ht.away):null },
+        { id:"ni-nor-ht-ft", text:"Norge leder til pause og slutt",   odds:1.6, resolve:(s,ev,ht,fin)=>fin&&ht?ht.home>ht.away&&s.homeGoals>s.awayGoals:null },
+      ]},
+      { icon:"🎯", label:"Eksakt sluttresultat", bets:[
+        { id:"ni-10", text:"1–0 til Norge", odds:5.0,  resolve:(s,ev,ht,fin)=>fin?s.homeGoals===1&&s.awayGoals===0:null },
+        { id:"ni-20", text:"2–0 til Norge", odds:5.0,  resolve:(s,ev,ht,fin)=>fin?s.homeGoals===2&&s.awayGoals===0:null },
+        { id:"ni-30", text:"3–0 til Norge", odds:5.5,  resolve:(s,ev,ht,fin)=>fin?s.homeGoals===3&&s.awayGoals===0:null },
+        { id:"ni-21", text:"2–1 til Norge", odds:6.0,  resolve:(s,ev,ht,fin)=>fin?s.homeGoals===2&&s.awayGoals===1:null },
+        { id:"ni-31", text:"3–1 til Norge", odds:6.5,  resolve:(s,ev,ht,fin)=>fin?s.homeGoals===3&&s.awayGoals===1:null },
+        { id:"ni-40", text:"4–0 til Norge", odds:7.0,  resolve:(s,ev,ht,fin)=>fin?s.homeGoals===4&&s.awayGoals===0:null },
+        { id:"ni-32", text:"3–2 til Norge", odds:9.0,  resolve:(s,ev,ht,fin)=>fin?s.homeGoals===3&&s.awayGoals===2:null },
+        { id:"ni-11", text:"1–1 uavgjort",  odds:10.0, resolve:(s,ev,ht,fin)=>fin?s.homeGoals===1&&s.awayGoals===1:null },
+        { id:"ni-01", text:"0–1 til Irak",  odds:15.0, resolve:(s,ev,ht,fin)=>fin?s.homeGoals===0&&s.awayGoals===1:null },
+      ]},
+      { icon:"🌟", label:"Spesial", bets:[
+        { id:"ni-haal-first", text:"Haaland scorer kampens første mål", odds:2.0, resolve:(s,ev,ht,fin)=>firstScorerPlayer(ev,"Haaland",fin) },
+        { id:"ni-odg-assist", text:"Ødegaard gir målgivende pasning",   odds:2.5, resolve:(s,ev,ht,fin)=>playerAssist(ev,"Odegaard",fin)||playerAssist(ev,"Ødegaard",fin) },
+        { id:"ni-sub-haal",   text:"Haaland byttes ut",                 odds:4.0, resolve:(s,ev,ht,fin)=>playerSubbedOff(ev,"Haaland",fin) },
+        { id:"ni-owngoal",    text:"Selvmål i kampen",                  odds:7.0, resolve:(s,ev,ht,fin)=>hasOwnGoal(ev,fin) },
+        { id:"ni-nor5",       text:"Norge scorer 5 eller flere mål",    odds:4.0, resolve:(s,ev,ht,fin)=>fin?s.homeGoals>=5:s.homeGoals>=5?true:null },
+        { id:"ni-ryerson-a",  text:"Ryerson gir målgivende",            odds:5.0, resolve:(s,ev,ht,fin)=>playerAssist(ev,"Ryerson",fin) },
+      ]},
+    ]
+  }
+};
+
+// ─── RESOLVER HELPERS ───
+function goalEvents(ev){ return ev.filter(e=>e.type==='Goal'&&e.detail!=='Missed Penalty'); }
+function playerScored(ev,...names){ const g=goalEvents(ev); return g.some(e=>names.some(n=>e.player?.name?.toLowerCase().includes(n.toLowerCase())))||null; }
+function playerGoalCount(ev,name,min,fin){ const c=goalEvents(ev).filter(e=>e.player?.name?.toLowerCase().includes(name.toLowerCase())).length; if(c>=min)return true; return fin?false:null; }
+function playerHattrick(ev,name,fin){ return playerGoalCount(ev,name,3,fin); }
+function firstScorerTeam(ev,teamKey,fin){ const g=goalEvents(ev); if(!g.length)return fin?false:null; return g[0].team?.name?.toLowerCase().includes(teamKey)||null; }
+function firstScorerPlayer(ev,name,fin){ const g=goalEvents(ev); if(!g.length)return fin?false:null; return g[0].player?.name?.toLowerCase().includes(name.toLowerCase())||null; }
+function goalBefore(ev,min,fin){ if(goalEvents(ev).some(e=>e.time?.elapsed<min))return true; return fin?false:null; }
+function overGoals(s,line,fin){ const tot=(s.homeGoals||0)+(s.awayGoals||0); if(tot>line)return true; return fin?false:null; }
+function bothTeamsScored(s,fin){ if((s.homeGoals||0)>0&&(s.awayGoals||0)>0)return true; return fin?false:null; }
+function teamScored(s,ev,teamKey,fin){ if((teamKey==='iraq'||teamKey==='senegal')?(s.awayGoals||0)>0:(s.homeGoals||0)>0)return true; return fin?false:null; }
+function hasCard(ev,type,fin){ if(ev.some(e=>e.type==='Card'&&e.detail===type))return true; return fin?false:null; }
+function overCards(ev,type,count,fin){ const c=ev.filter(e=>e.type==='Card'&&e.detail===type).length; if(c>count)return true; return fin?false:null; }
+function hasPenalty(ev,fin){ if(ev.some(e=>e.type==='Goal'&&e.detail==='Penalty'||e.type==='Miss'))return true; return fin?false:null; }
+function penaltyScored(ev,fin){ if(ev.some(e=>e.type==='Goal'&&e.detail==='Penalty'))return true; return fin?false:null; }
+function penaltyMissed(ev,fin){ if(ev.some(e=>e.type==='Miss'&&e.detail==='Missed Penalty'))return true; return fin?false:null; }
+function playerCard(ev,name,type,fin){ if(ev.some(e=>e.type==='Card'&&e.detail===type&&e.player?.name?.toLowerCase().includes(name.toLowerCase())))return true; return fin?false:null; }
+function hasOwnGoal(ev,fin){ if(ev.some(e=>e.type==='Goal'&&e.detail==='Own Goal'))return true; return fin?false:null; }
+function playerAssist(ev,name,fin){ if(ev.some(e=>e.type==='Goal'&&e.assist?.name?.toLowerCase().includes(name.toLowerCase())))return true; return fin?false:null; }
+function playerSubbedOff(ev,name,fin){ if(ev.some(e=>e.type==='subst'&&e.player?.name?.toLowerCase().includes(name.toLowerCase())))return true; return fin?false:null; }
+function countSubs(ev){ return ev.filter(e=>e.type==='subst').length; }
+function senegalLedAtSomePoint(ev,fin){
+  let h=0,a=0;
+  for(const e of goalEvents(ev)){ if(e.team?.name?.toLowerCase().includes('france'))h++; else a++; if(a>h)return true; }
+  return fin?false:null;
+}
+
+// ─── FLAT BET LOOKUP ───
+function getBetDef(mk, betId){
+  for(const cat of BET_CATALOG[mk]?.categories||[]){ const b=cat.bets.find(x=>x.id===betId); if(b)return b; }
+  return null;
+}
+
+// ─── AUTO-RESOLVE BETS FROM LIVE DATA ───
+let alreadyCelebrated = new Set();
+
+function autoResolveBets(mk, score){
+  const openBets = Object.entries(bets).filter(([,b])=>b.matchKey===mk&&b.status==='open');
+  if(!openBets.length)return;
+  const ev = score.events||[];
+  const isFin = score.status==='FT';
+  const ht = score.halftime; // {home, away} or null
+  const s = { homeGoals: score.homeGoals, awayGoals: score.awayGoals };
+
+  const upd={};
+  const wins=[];
+
+  for(const[id,bet]of openBets){
+    const def = getBetDef(mk, bet.betId);
+    if(!def?.resolve)continue;
+    let result;
+    try{ result = def.resolve(s, ev, ht, isFin); }catch(e){ result=null; }
+    if(result===true){
+      upd[`bets/${id}/status`]='won';
+      wins.push({id, bet});
+    } else if(result===false){
+      upd[`bets/${id}/status`]='lost';
+    }
+  }
+
+  if(Object.keys(upd).length) update(ref(db), upd);
+
+  // Trigger celebration for new wins
+  for(const{id,bet}of wins){
+    if(!alreadyCelebrated.has(id)){
+      alreadyCelebrated.add(id);
+      triggerCelebration(bet);
+    }
+  }
+}
+
+// ─── CELEBRATION ───
+function triggerCelebration(bet){
+  const el = document.getElementById('celebration');
+  const isGoal = bet.desc?.toLowerCase().includes('scorer')||bet.desc?.toLowerCase().includes('mål')||bet.desc?.toLowerCase().includes('hattrick');
+  const emoji = isGoal?'⚽':bet.desc?.includes('kort')?'🟨':bet.desc?.includes('straffe')?'🎯':'🎉';
+  document.getElementById('celeb-emoji').textContent = emoji;
+  document.getElementById('celeb-title').textContent = isGoal?'MÅÅÅL!':'TREFFER!';
+  document.getElementById('celeb-desc').textContent = bet.desc;
+  document.getElementById('celeb-placer').textContent = `${bet.placerName} vinner!`;
+  document.getElementById('celeb-payout').textContent = `🍺 Del ut ${bet.payout} slurker!`;
+  spawnConfetti();
+  el.classList.add('show');
+  setTimeout(()=>{ el.classList.remove('show'); }, 6000);
+}
+
+function spawnConfetti(){
+  const el=document.getElementById('celebration');
+  const colors=['#1D9E75','#EF9F27','#E24B4A','#4A90D9','#fff','#c9a227'];
+  for(let i=0;i<60;i++){
+    const c=document.createElement('div');
+    c.className='confetti';
+    c.style.cssText=`left:${Math.random()*100}%;top:-20px;background:${colors[Math.floor(Math.random()*colors.length)]};width:${6+Math.random()*8}px;height:${6+Math.random()*8}px;animation-duration:${2+Math.random()*3}s;animation-delay:${Math.random()*1}s`;
+    el.appendChild(c);
+    setTimeout(()=>c.remove(), 5000);
+  }
+}
+
+let pendingBet = null;
+
+window.renderBetCatalog = function(){
+  const mk = document.getElementById('bet-match-sel').value;
+  const el = document.getElementById('bet-catalog');
+  if(!mk){ el.innerHTML=''; return; }
+  const catalog = BET_CATALOG[mk]; if(!catalog){ el.innerHTML=''; return; }
+  const openBetsByBetId={};
+  Object.values(bets).filter(b=>b.matchKey===mk&&b.status==='open').forEach(b=>{ openBetsByBetId[b.betId]=b; });
+  const wonIds=new Set(Object.values(bets).filter(b=>b.matchKey===mk&&b.status==='won').map(b=>b.betId));
+  const lostIds=new Set(Object.values(bets).filter(b=>b.matchKey===mk&&b.status==='lost').map(b=>b.betId));
+
+  el.innerHTML = catalog.categories.map(cat=>`
+    <div class="cat-section">
+      <div class="cat-header">${cat.icon} ${cat.label}</div>
+      ${cat.bets.map(b=>{
+        const placed=openBetsByBetId[b.id];
+        const won=wonIds.has(b.id); const lost=lostIds.has(b.id);
+        const disabled=placed||won||lost;
+        let tag='';
+        if(placed) tag=`<span style="color:var(--green);font-size:12px">✓ Plassert av ${placed.placerName}</span>`;
+        if(won)    tag=`<span style="color:var(--green);font-size:12px">🎉 TREFF!</span>`;
+        if(lost)   tag=`<span style="color:var(--text3);font-size:12px">❌ Bom</span>`;
+        return`<div class="bet-item${disabled?' already-placed':''}" onclick="${disabled?'':` selectBet('${mk}','${b.id}')`}">
+          <div class="bet-item-text">${b.text} ${tag}</div>
+          <div class="bet-item-odds"><span class="odds-badge">${b.odds}×</span></div>
+        </div>`;
+      }).join('')}
+    </div>`).join('');
+};
+
+window.selectBet = function(mk, betId){
+  const bet = getBetDef(mk, betId); if(!bet) return;
+  pendingBet = { matchKey:mk, betId, betText:bet.text, odds:bet.odds };
+  const sel = document.getElementById('bet-placer-sel');
+  sel.innerHTML = '<option value="">Velg spiller...</option>' + Object.entries(players).map(([id,p])=>`<option value="${id}">${p.name}</option>`).join('');
+  document.getElementById('bet-place-desc').textContent = bet.text;
+  document.getElementById('bet-place-odds').textContent = `Odds: ${bet.odds}× · Du drikker innsatsen med én gang`;
+  document.getElementById('bet-stake').value = '2';
+  updatePayoutPreview();
+  document.getElementById('bet-place-panel').style.display='block';
+  document.getElementById('bet-place-panel').scrollIntoView({behavior:'smooth',block:'nearest'});
+};
+
+window.updatePayoutPreview = function(){
+  const stake = parseInt(document.getElementById('bet-stake').value)||0;
+  const payout = Math.round(stake*(pendingBet?.odds||1));
+  document.getElementById('bet-payout-preview').innerHTML =
+    `Du drikker <strong style="color:var(--red)">${stake} slurk${stake!==1?'er':''}</strong> nå → vinner du deler du ut <strong style="color:var(--green)">${payout} slurk${payout!==1?'er':''}</strong>`;
+};
+document.addEventListener('input', e=>{ if(e.target.id==='bet-stake') updatePayoutPreview(); });
+
+window.confirmBet = function(){
+  if(!pendingBet)return;
+  const pid = document.getElementById('bet-placer-sel').value;
+  const stake = parseInt(document.getElementById('bet-stake').value)||0;
+  if(!pid){ showToast('Velg spiller!'); return; }
+  if(stake<1){ showToast('Minst 1 slurk!'); return; }
+  const payout = Math.round(stake * pendingBet.odds);
+  push(ref(db,'bets'),{
+    matchKey:pendingBet.matchKey,
+    matchLabel:BET_CATALOG[pendingBet.matchKey]?.home+'–'+BET_CATALOG[pendingBet.matchKey]?.away,
+    betId:pendingBet.betId, desc:pendingBet.betText, odds:pendingBet.odds,
+    stake, payout, placerId:pid, placerName:players[pid]?.name||'', status:'open', createdAt:Date.now()
+  });
+  document.getElementById('bet-place-panel').style.display='none';
+  pendingBet=null;
+  showToast(`Bet plassert! Drikk ${stake} slurker nå 🍺`);
+  renderBetCatalog(); renderBets();
+};
+window.cancelBet=function(){ document.getElementById('bet-place-panel').style.display='none'; pendingBet=null; };
+
+function renderBets(){
+  const el=document.getElementById('bets-list');
+  const open=Object.entries(bets).filter(([,b])=>b.status==='open');
+  if(!open.length){ el.innerHTML='<div class="empty">Ingen aktive veddemål 🍺</div>'; return; }
+  el.innerHTML=open.map(([id,b])=>`
+    <div class="bet-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px">
+        <div><span class="badge badge-open">Åpen</span>${b.matchLabel?` <span style="font-size:12px;color:var(--text2)">${b.matchLabel}</span>`:''}</div>
+        <span class="sip-badge">${b.odds}×</span>
+      </div>
+      <div style="font-size:15px;font-weight:500;margin-bottom:4px">${b.desc}</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:${isAdmin()?'10px':'0'}">
+        <span style="color:var(--text)">${b.placerName}</span> · 🍺${b.stake} inn → 🎉${b.payout} ut
+      </div>
+      ${isAdmin()?`<div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-sm" onclick="deleteBet('${id}')">Slett</button>
+      </div>`:''}
+    </div>`).join('');
+}
+window.deleteBet=function(id){ remove(ref(db,'bets/'+id)); };
+        { id:"fs-dembele",  text:"Dembélé scorer i kampen",           odds:2.5 },
+        { id:"fs-olise",    text:"Olise scorer i kampen",             odds:3.0 },
+        { id:"fs-thuram",   text:"Thuram scorer i kampen",            odds:3.5 },
+        { id:"fs-diatta",   text:"Diatta scorer for Senegal",         odds:4.0 },
+        { id:"fs-sarr",     text:"Ismaila Sarr scorer i kampen",      odds:3.5 },
+        { id:"fs-jakobs",   text:"Jakobs scorer for Senegal",         odds:7.0 },
+        { id:"fg-fra",      text:"Frankrike scorer først",            odds:1.5 },
+        { id:"fg-sen",      text:"Senegal scorer først",              odds:4.0 },
+        { id:"fg-15",       text:"Mål innen de første 15 min",        odds:2.5 },
+        { id:"o25",         text:"Over 2,5 mål totalt",               odds:1.8 },
+        { id:"o45",         text:"Over 4,5 mål totalt",               odds:3.5 },
+        { id:"btts",        text:"Begge lag scorer",                  odds:2.2 },
+        { id:"cleanfra",    text:"Frankrike holder nullen",           odds:2.0 },
+        { id:"cleansen",    text:"Senegal holder nullen",             odds:5.0 },
+        { id:"hattrick",    text:"Mbappé hattrick",                   odds:8.0 },
+      ]},
+      { icon:"🟨", label:"Kort & disiplin", bets:[
+        { id:"rc-any",      text:"Rødt kort i kampen",                odds:3.5 },
+        { id:"yc-o3",       text:"Over 3 gule kort totalt",           odds:2.0 },
+        { id:"yc-o5",       text:"Over 5 gule kort totalt",           odds:4.0 },
+        { id:"pen-any",     text:"Straffespark i kampen",             odds:3.0 },
+        { id:"pen-scored",  text:"Straffespark blir scoret",          odds:3.5 },
+        { id:"pen-miss",    text:"Straffespark blir brent",           odds:9.0 },
+      ]},
+      { icon:"⏱️", label:"Omganger", bets:[
+        { id:"h1-goal",     text:"Mål i 1. omgang",                   odds:1.6 },
+        { id:"h1-nogoal",   text:"Ingen mål i 1. omgang",             odds:2.8 },
+        { id:"h1-fra",      text:"Frankrike leder til pause",         odds:1.8 },
+        { id:"h1-sen",      text:"Senegal leder til pause",           odds:5.0 },
+        { id:"h2-more",     text:"Flest mål i 2. omgang",             odds:1.8 },
+        { id:"et",          text:"Kampen går til ekstraomgang",       odds:9.0 },
+      ]},
+      { icon:"🎯", label:"Eksakt sluttresultat", bets:[
+        { id:"res-10",      text:"1–0 til Frankrike",                 odds:5.0 },
+        { id:"res-20",      text:"2–0 til Frankrike",                 odds:5.5 },
+        { id:"res-21",      text:"2–1 til Frankrike",                 odds:6.0 },
+        { id:"res-30",      text:"3–0 til Frankrike",                 odds:7.0 },
+        { id:"res-31",      text:"3–1 til Frankrike",                 odds:8.0 },
+        { id:"res-00",      text:"0–0 uavgjort",                      odds:9.0 },
+        { id:"res-11",      text:"1–1 uavgjort",                      odds:7.0 },
+        { id:"res-01",      text:"0–1 til Senegal",                   odds:9.0 },
+        { id:"res-02",      text:"0–2 til Senegal",                   odds:12.0 },
+      ]},
+      { icon:"🌟", label:"Spesial", bets:[
+        { id:"sub-mbappe",  text:"Mbappé byttes ut før 70 min",       odds:3.0 },
+        { id:"owngoal",     text:"Selvmål i kampen",                  odds:6.0 },
+        { id:"var",         text:"VAR brukes til å omgjøre avgjørelse",odds:2.5},
+        { id:"sub5",        text:"Totalt 5 eller flere bytter",       odds:1.6 },
+        { id:"fra-comeback",text:"Frankrike snur resultat etter pause",odds:6.0},
+        { id:"sen-lead",    text:"Senegal leder på noe tidspunkt",    odds:4.0 },
+        { id:"mbappe-assist","text":"Mbappé gir målgivende pasning",  odds:2.5 },
+        { id:"yc-mbappe",   text:"Mbappé får gult kort",              odds:5.0 },
+      ]},
+    ]
+  },
+  "NOR-IRQ": {
+    home: "Norge", away: "Irak",
+    categories: [
+      { icon:"⚽", label:"Mål", bets:[
+        { id:"ni-haaland",  text:"Haaland scorer i kampen",           odds:1.4 },
+        { id:"ni-sorloth",  text:"Sørloth scorer i kampen",           odds:3.0 },
+        { id:"ni-odegaard", text:"Ødegaard scorer i kampen",          odds:4.0 },
+        { id:"ni-nusa",     text:"Nusa scorer i kampen",              odds:5.0 },
+        { id:"ni-bobb",     text:"Bobb scorer i kampen",              odds:6.0 },
+        { id:"ni-ryerson",  text:"Ryerson scorer (innlegg/corner)",   odds:8.0 },
+        { id:"ni-iraq-any", text:"Irak scorer i kampen",              odds:4.5 },
+        { id:"ni-fg-nor",   text:"Norge scorer først",                odds:1.3 },
+        { id:"ni-fg-irq",   text:"Irak scorer først",                 odds:6.0 },
+        { id:"ni-fg-15",    text:"Mål innen de første 15 min",        odds:2.0 },
+        { id:"ni-o35",      text:"Over 3,5 mål totalt",               odds:1.8 },
+        { id:"ni-o55",      text:"Over 5,5 mål totalt",               odds:3.0 },
+        { id:"ni-haat2",    text:"Haaland scorer 2+",                 odds:2.5 },
+        { id:"ni-haat3",    text:"Haaland hattrick",                  odds:4.5 },
+        { id:"ni-clean",    text:"Norge holder nullen",               odds:1.8 },
+        { id:"ni-btts",     text:"Begge lag scorer",                  odds:3.5 },
+      ]},
+      { icon:"🟨", label:"Kort & disiplin", bets:[
+        { id:"ni-rc",       text:"Rødt kort i kampen",                odds:4.0 },
+        { id:"ni-yc3",      text:"Over 3 gule kort totalt",           odds:2.5 },
+        { id:"ni-pen",      text:"Straffespark i kampen",             odds:3.5 },
+        { id:"ni-pen-haal", text:"Haaland tar straffespark",          odds:4.0 },
+      ]},
+      { icon:"⏱️", label:"Omganger", bets:[
+        { id:"ni-h1goal",   text:"Mål i 1. omgang",                   odds:1.4 },
+        { id:"ni-h1nor",    text:"Norge leder til pause",             odds:1.5 },
+        { id:"ni-h1-2plus", text:"2+ mål i 1. omgang",               odds:2.0 },
+        { id:"ni-h2more",   text:"Flest mål i 2. omgang",             odds:2.0 },
+        { id:"ni-nor-ht-ft",text:"Norge leder både til pause og slutt",odds:1.6},
+      ]},
+      { icon:"🎯", label:"Eksakt sluttresultat", bets:[
+        { id:"ni-10",       text:"1–0 til Norge",                     odds:5.0 },
+        { id:"ni-20",       text:"2–0 til Norge",                     odds:5.0 },
+        { id:"ni-30",       text:"3–0 til Norge",                     odds:5.5 },
+        { id:"ni-21",       text:"2–1 til Norge",                     odds:6.0 },
+        { id:"ni-31",       text:"3–1 til Norge",                     odds:6.5 },
+        { id:"ni-40",       text:"4–0 til Norge",                     odds:7.0 },
+        { id:"ni-32",       text:"3–2 til Norge",                     odds:9.0 },
+        { id:"ni-11",       text:"1–1 uavgjort",                      odds:10.0},
+        { id:"ni-01",       text:"0–1 til Irak",                      odds:15.0},
+      ]},
+      { icon:"🌟", label:"Spesial", bets:[
+        { id:"ni-haal-first","text":"Haaland scorer kampens første mål",odds:2.0},
+        { id:"ni-odg-assist","text":"Ødegaard gir målgivende pasning", odds:2.5},
+        { id:"ni-sub-haal", text:"Haaland byttes ut",                 odds:4.0 },
+        { id:"ni-owngoal",  text:"Selvmål i kampen",                  odds:7.0 },
+        { id:"ni-var",      text:"VAR brukes til å omgjøre avgjørelse",odds:3.0},
+        { id:"ni-nor5",     text:"Norge scorer 5 eller flere mål",    odds:4.0 },
+        { id:"ni-nusa-run", text:"Nusa dribbler forbi 3+ spillere",   odds:5.0 },
+        { id:"ni-ryerson-a","text":"Ryerson gir målgivende",          odds:5.0 },
+      ]},
+    ]
+  }
+};
+
+
+// ─── SCOREBOARD ───
+function getLiveTipPoints(playerId){
+  return Object.values(tips).filter(t=>t.playerId===playerId).reduce((sum,t)=>sum+getTipPoints(t),0);
+}
+function getSorted(){
+  return Object.entries(players).sort((a,b)=>{
+    const ta=(getLiveTipPoints(b[0]))+(b[1].sipScore||0);
+    const tb=(getLiveTipPoints(a[0]))+(a[1].sipScore||0);
+    return ta-tb;
+  });
+}
+function renderScore(){
+  const el=document.getElementById('scoreboard');
+  const list=getSorted();
+  if(!list.length){ el.innerHTML='<div class="empty">Ingen spillere enda</div>'; return; }
+  el.innerHTML='<div class="score-card">'+list.map(([id,p],i)=>{
+    const tip=getLiveTipPoints(id); const sip=p.sipScore||0; const tot=tip+sip;
+    return`<div class="score-row">
+      <div style="font-size:22px;width:34px;text-align:center">${['🥇','🥈','🥉'][i]||(i+1)}</div>
+      ${avatarEl(p,id)}
+      <div style="flex:1;margin-left:10px"><div style="font-size:15px;font-weight:500">${p.name}</div><div style="font-size:12px;color:var(--text2)">🎯${tip}p · 🍺${sip>=0?'+':''}${sip}</div></div>
+      <div style="text-align:right"><div style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:1px;color:${tot>=0?'var(--green)':'var(--red)'}">${tot>0?'+':''}${tot}</div></div>
+    </div>`;}).join('')+'</div>';
+
+  const histEl=document.getElementById('history-section');
+  let html='';
+  const tipList=Object.values(tips);
+  if(tipList.length){
+    const byMatch={};
+    tipList.forEach(t=>{ if(!byMatch[t.matchKey])byMatch[t.matchKey]=[]; byMatch[t.matchKey].push(t); });
+    html+=Object.entries(byMatch).map(([mk,ts])=>{
+      const score=liveScores[mk];
+      const isLive=score&&['1H','HT','2H','ET','P'].includes(score.status);
+      const isFT=score&&score.status==='FT';
+      return`<div class="card" style="margin-bottom:12px">
+        <div class="card-label">${MATCHES[mk]?.label||mk} ${isLive?'🔴 LIVE':isFT?'✅ Ferdig':'⏳'}</div>
+        ${ts.map(t=>{
+          const pts=getTipPoints(t);
+          return`<div class="history-item">
+            <span>${t.resolved?(pts>=7?'🏆':pts>=4?'✅':'🟡'):isLive?'🔴':'⏳'}</span>
+            <span style="flex:1">${t.playerName}: ${t.homeGoals}–${t.awayGoals} (${t.hub})</span>
+            <span style="color:var(--amber);font-weight:600">${pts}p${!t.resolved&&isLive?' 🔴':''}</span>
+          </div>`;}).join('')}
+      </div>`;}).join('');
+  }
+  histEl.innerHTML=html;
+}
+
+// ─── TV VIEW ───
+function renderTV(){ renderTVPodium(); renderTVScore(); renderTVLive(); renderTVBets(); }
+
+function miiHTML(p, id, spotClass){
+  const hasImg=p&&p.avatar&&p.avatar.startsWith('data:');
+  const faceInner=hasImg?`<img src="${p.avatar}" alt="${p.name}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`:`<span>${p&&p.name?p.name.charAt(0).toUpperCase():'?'}</span>`;
+  const isFirst=spotClass==='spot-1';
+  return`<div class="mii-wrap">
+    <div class="mii-head-wrap">
+      ${isFirst?'<div class="mii-crown">👑</div>':''}
+      <div class="mii-face">${faceInner}</div>
+    </div>
+    <div class="mii-neck"></div>
+    <div class="mii-body">
+      <div class="mii-arms-l"></div>
+      <div class="mii-arms-r"></div>
+    </div>
+    <div class="mii-legs"><div class="mii-leg"></div><div class="mii-leg"></div></div>
+  </div>`;
+}
+
+function renderTVPodium(){
+  const stage=document.getElementById('podium-stage'); if(!stage)return;
+  const sorted=getSorted();
+  const spots=[
+    { rank:2, spot:'spot-2', idx:1 },
+    { rank:1, spot:'spot-1', idx:0 },
+    { rank:3, spot:'spot-3', idx:2 }
+  ];
+  stage.innerHTML=spots.map(({rank,spot,idx})=>{
+    const entry=sorted[idx];
+    if(!entry)return`<div class="podium-spot ${spot}"><div style="height:80px"></div><div class="podium-block"><span class="podium-num">${rank}</span></div></div>`;
+    const [id,p]=entry;
+    const tip=getLiveTipPoints(id); const sip=p.sipScore||0; const tot=tip+sip;
+    return`<div class="podium-spot ${spot}" onclick="showBreakdown('${id}')" style="cursor:pointer" title="Klikk for poengdetaljer">
+      ${miiHTML(p,id,spot)}
+      <div class="mii-label">${p.name}</div>
+      <div class="mii-pts">${tot>0?'+':''}${tot}p</div>
+      <div class="podium-block"><span class="podium-num">${rank}</span></div>
+    </div>`;
+  }).join('');
+}
+
+window.showBreakdown=function(playerId){
+  const p=players[playerId]; if(!p)return;
+  const playerTips=Object.values(tips).filter(t=>t.playerId===playerId);
+  const sip=p.sipScore||0;
+  const tip=getLiveTipPoints(playerId);
+  const tot=tip+sip;
+
+  let rows='';
+
+  // Per match breakdown
+  for(const t of playerTips){
+    const mk=t.matchKey;
+    const score=liveScores[mk];
+    const isLive=score&&['1H','HT','2H','ET','P'].includes(score.status);
+    const isFT=score&&score.status==='FT';
+    const hg=score&&typeof score.homeGoals==='number'?score.homeGoals:null;
+    const ag=score&&typeof score.awayGoals==='number'?score.awayGoals:null;
+
+    rows+=`<div style="margin-bottom:14px">
+      <div style="font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin-bottom:6px">${MATCHES[mk]?.label||mk} ${isLive?'🔴':isFT?'✅':'⏳'}</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:8px">Tippet: ${MATCHES[mk]?.home||'H'} ${t.homeGoals}–${t.awayGoals} ${MATCHES[mk]?.away||'A'} (${t.hub})</div>`;
+
+    if(hg!==null){
+      const actualHub=hg>ag?'H':hg<ag?'B':'U';
+      const hubHit=t.hub===actualHub;
+      const diffHit=(t.homeGoals-t.awayGoals)===(hg-ag);
+      const exactHit=t.homeGoals===hg&&t.awayGoals===ag;
+      rows+=breakdown('Rett utfall (HUB)', hubHit?3:0, 3, hubHit);
+      rows+=breakdown('Rett målforskjell', diffHit?3:0, 3, diffHit);
+      rows+=breakdown('Eksakt stilling', exactHit?3:0, 3, exactHit);
+    } else {
+      rows+=breakdown('Rett utfall (HUB)', '?', 3, null);
+      rows+=breakdown('Rett målforskjell', '?', 3, null);
+      rows+=breakdown('Eksakt stilling', '?', 3, null);
+    }
+
+    if(isFT&&score){
+      const events=score.events||[];
+      const firstGoal=events.find(e=>e.type==='Goal');
+      const hasRed=events.some(e=>e.type==='Card'&&e.detail==='Red Card');
+      const fhg=events.some(e=>e.type==='Goal'&&e.time?.elapsed<=45);
+      let actualFS='N';
+      if(firstGoal){ const home=MATCHES[mk]?.home||''; actualFS=firstGoal.team.name.toLowerCase().includes(home.toLowerCase().split(' ')[0])?'H':'A'; }
+      rows+=breakdown('Første scorer', (t.firstScorer===actualFS)?2:0, 2, t.firstScorer===actualFS);
+      rows+=breakdown('Rødt kort', ((t.redCard==='Y')===hasRed)?2:0, 2, (t.redCard==='Y')===hasRed);
+      rows+=breakdown('Mål i 1. omgang', ((t.firstHalfGoal==='Y')===fhg)?2:0, 2, (t.firstHalfGoal==='Y')===fhg);
+    } else {
+      rows+=breakdown('Første scorer', '?', 2, null);
+      rows+=breakdown('Rødt kort', '?', 2, null);
+      rows+=breakdown('Mål i 1. omgang', '?', 2, null);
+    }
+
+    rows+=`<div class="breakdown-row" style="margin-top:4px;border-top:1px solid var(--border2);padding-top:8px">
+      <span style="font-size:14px;font-weight:600;color:var(--text)">Tipping totalt</span>
+      <span style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--amber)">${getTipPoints(t)}p</span>
+    </div></div>`;
+  }
+
+  // Slurker
+  rows+=`<div class="breakdown-row">
+    <span class="breakdown-label">🍺 Slurker (netto)</span>
+    <span class="breakdown-pts ${sip>=0?'hit':'miss'}">${sip>=0?'+':''}${sip} slurk${Math.abs(sip)!==1?'er':''}</span>
+  </div>`;
+
+  // Total
+  rows+=`<div class="breakdown-row" style="margin-top:4px">
+    <span style="font-size:16px;font-weight:600;color:var(--text)">TOTALT</span>
+    <span style="font-family:'Bebas Neue',sans-serif;font-size:28px;color:${tot>=0?'var(--green)':'var(--red)'}">${tot>0?'+':''}${tot}p</span>
+  </div>`;
+
+  document.getElementById('modal-content').innerHTML=`
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:1rem">
+      ${avatarEl(p,playerId)}
+      <div><div style="font-size:18px;font-weight:600">${p.name}</div><div style="font-size:13px;color:var(--text2)">Poengdetaljer</div></div>
+    </div>${rows}`;
+  document.getElementById('modal-overlay').style.display='flex';
+};
+
+function breakdown(label, pts, max, hit){
+  const cls=hit===null?'pending':hit?'hit':'miss';
+  const icon=hit===null?'⏳':hit?'✅':'❌';
+  return`<div class="breakdown-row">
+    <span class="breakdown-label">${icon} ${label}</span>
+    <span class="breakdown-pts ${cls}">${pts===0||pts==='?'?pts:'+'+pts}/${max}p</span>
+  </div>`;
+}
+
+window.closeModal=function(e){
+  if(e&&e.target!==document.getElementById('modal-overlay')&&e.target!==document.querySelector('.modal-close'))return;
+  document.getElementById('modal-overlay').style.display='none';
+};
+
+function renderTVScore(){
+  const el=document.getElementById('tv-scoreboard'); if(!el)return;
+  const list=getSorted();
+  if(!list.length){ el.innerHTML='<div style="color:var(--text3)">Ingen spillere</div>'; return; }
+  el.innerHTML=list.map(([id,p],i)=>{
+    const tip=getLiveTipPoints(id); const sip=p.sipScore||0; const tot=tip+sip;
+    return`<div class="tv-score-row" onclick="showBreakdown('${id}')" style="cursor:pointer">
+      <div class="tv-rank">${['🥇','🥈','🥉'][i]||(i+1)}</div>
+      ${avatarEl(p,id)}
+      <div class="tv-name" style="margin-left:10px">${p.name}</div>
+      <div style="text-align:right">
+        <div class="tv-val ${tot>=0?'pos':'neg'}">${tot>0?'+':''}${tot}</div>
+        <div style="font-size:11px;color:var(--text2)">🎯${tip} · 🍺${sip>=0?'+':''}${sip}</div>
+      </div>
+    </div>`;}).join('');
+}
+
+function renderTVLive(){
+  const el=document.getElementById('tv-live'); if(!el)return;
+  const entries=Object.entries(liveScores);
+  if(!entries.length){ el.innerHTML='<div style="color:var(--text3);font-size:14px">Ingen live kamper</div>'; return; }
+  el.innerHTML=entries.map(([mk,s])=>{
+    const m=MATCHES[mk]; const isLive=['1H','HT','2H','ET','P'].includes(s.status);
+    return`<div style="margin-bottom:16px">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:4px">${isLive?'<span class="live-badge">LIVE</span>':s.status==='FT'?'✅':''} ${s.elapsed?s.elapsed+"'":''}  ${m?.label||mk}</div>
+      <div class="tv-live-score">${s.homeGoals} – ${s.awayGoals}</div>
+    </div>`;}).join('');
+}
+
+function renderTVBets(){
+  const el=document.getElementById('tv-bets'); if(!el)return;
+  const open=Object.entries(bets).filter(([,b])=>b.status==='open');
+  if(!open.length){ el.innerHTML='<div style="color:var(--text3)">Ingen aktive veddemål</div>'; return; }
+  el.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">`+
+    open.map(([,b])=>`<div style="background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:.75rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:12px;color:var(--text2)">${b.matchLabel||''}</span>
+        <span class="sip-badge">${b.odds}×</span>
+      </div>
+      <div style="font-size:14px;font-weight:500;margin-bottom:4px">${b.desc}</div>
+      <div style="font-size:12px;color:var(--text2)">${b.placerName} · 🍺${b.stake} → 🎉${b.payout}</div>
+    </div>`).join('')+'</div>';
+}
+
+// ─── TOAST ───
+function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.style.opacity='1'; clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.style.opacity='0',3000); }
+window.showToast=showToast;
+</script>
+</body>
+</html>
