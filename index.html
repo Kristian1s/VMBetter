@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VM Betting 🍺</title>
+<title>VM @Beergarden 🍺</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -202,7 +202,7 @@ select option{background:var(--bg3)}
 
 <header>
   <div class="header-top">
-    <div class="logo">VM <span>BETTING</span> 🍺</div>
+    <div class="logo">VM <span>Slurke-Betting</span> 🍺</div>
     <div class="sync-row">
       <span class="dot" id="sync-dot"></span>
       <span id="sync-label">Kobler til...</span>
@@ -211,7 +211,7 @@ select option{background:var(--bg3)}
   <div class="tabs">
     <button class="tab active" onclick="showTab('spillere')">Spillere</button>
     <button class="tab" onclick="showTab('tipping')">Tipping</button>
-    <button class="tab" onclick="showTab('betting')">Betting</button>
+    <button class="tab" onclick="showTab('Slurke-Betting')">Slurke-Betting</button>
     <button class="tab" onclick="showTab('poeng')">Poeng</button>
     <button class="tab tab-tv" onclick="showTab('tv')">📺 Storskjerm</button>
   </div>
@@ -249,9 +249,9 @@ select option{background:var(--bg3)}
     <div id="tip-form"></div>
   </div>
 
-  <!-- ===== BETTING ===== -->
-  <div class="section" id="tab-betting">
-    <div class="section-title">Slurke-betting</div>
+  <!-- ===== Slurke-Betting ===== -->
+  <div class="section" id="tab-Slurke-Betting">
+    <div class="section-title">Slurke-Slurke-Betting</div>
     <div class="card">
       <div class="field"><label>Hva veddes det på?</label><textarea id="bet-desc" placeholder="f.eks. «Norge scorer innen 20 min»"></textarea></div>
       <div class="row2 field">
@@ -291,7 +291,7 @@ select option{background:var(--bg3)}
 
     <!-- PODIUM (full width) -->
     <div class="podium-wrap tv-card" id="tv-podium">
-      <div class="podium-headline">VM <span>BETTING</span> 🏆</div>
+      <div class="podium-headline">VM <span>Slurke-Betting</span> 🏆</div>
       <div class="podium-stage" id="podium-stage"></div>
     </div>
 
@@ -330,10 +330,10 @@ import { getDatabase, ref, onValue, set, push, update, remove } from "https://ww
 
 const firebaseConfig = {
   apiKey: "AIzaSyD5lE-c5gZrosPDxnUpEc2MalMawX4lN4U",
-  authDomain: "vmbetting-9eaff.firebaseapp.com",
-  databaseURL: "https://vmbetting-9eaff-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "vmbetting-9eaff",
-  storageBucket: "vmbetting-9eaff.firebasestorage.app",
+  authDomain: "vmSlurke-Betting-9eaff.firebaseapp.com",
+  databaseURL: "https://vmSlurke-Betting-9eaff-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "vmSlurke-Betting-9eaff",
+  storageBucket: "vmSlurke-Betting-9eaff.firebasestorage.app",
   messagingSenderId: "349618378088",
   appId: "1:349618378088:web:be7d64cb173c5a833772dd"
 };
@@ -358,7 +358,7 @@ function isAdmin(){ return window.innerWidth>=900; }
 
 // ─── FIREBASE ───
 onValue(ref(db,'players'), s=>{ players=s.val()||{}; setSync(true); renderPlayers(); renderBettorSelect(); renderPlayerSelects(); if(currentTab==='poeng')renderScore(); if(currentTab==='tv')renderTV(); });
-onValue(ref(db,'bets'), s=>{ bets=s.val()||{}; if(currentTab==='betting')renderBets(); if(currentTab==='tv')renderTV(); });
+onValue(ref(db,'bets'), s=>{ bets=s.val()||{}; if(currentTab==='Slurke-Betting')renderBets(); if(currentTab==='tv')renderTV(); });
 onValue(ref(db,'tips'), s=>{ tips=s.val()||{}; if(currentTab==='poeng')renderScore(); if(currentTab==='tv')renderTV(); });
 
 function setSync(live){ document.getElementById('sync-dot').className='dot'+(live?' live':''); document.getElementById('sync-label').textContent=live?'Live':'Kobler til...'; }
@@ -369,12 +369,12 @@ window.showTab=function(id){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   document.getElementById('tab-'+id).classList.add('active');
-  ['spillere','tipping','betting','poeng','tv'].forEach((t,i)=>{ const el=document.querySelectorAll('.tab')[i]; if(el)el.classList.toggle('active',t===id); });
+  ['spillere','tipping','Slurke-Betting','poeng','tv'].forEach((t,i)=>{ const el=document.querySelectorAll('.tab')[i]; if(el)el.classList.toggle('active',t===id); });
   const mw=document.getElementById('main-wrap');
   if(id==='tv'){ mw.style.maxWidth='none'; mw.style.padding='0'; }
   else{ mw.style.maxWidth=''; mw.style.padding=''; }
   if(id==='tipping'){ renderPlayerSelects(); renderLiveBox(); }
-  if(id==='betting'){ renderBets(); renderBettorSelect(); }
+  if(id==='Slurke-Betting'){ renderBets(); renderBettorSelect(); }
   if(id==='poeng')renderScore();
   if(id==='tv')renderTV();
 };
@@ -618,7 +618,7 @@ window.submitTip=function(mk){
   else{ push(ref(db,'tips'),data); showToast('Tipp registrert! 🎯'); }
   document.getElementById('tip-status').innerHTML=`<div class="card" style="text-align:center;padding:.75rem"><div style="color:#4ecfa0;font-weight:500">✅ Registrert!</div><div style="font-size:13px;color:var(--text2);margin-top:4px">${MATCHES[mk].home} ${data.homeGoals}–${data.awayGoals} ${MATCHES[mk].away} (${data.hub})</div></div>`;
 };
-// ─── BETTING ───
+// ─── Slurke-Betting ───
 window.addBet=function(){
   const desc=document.getElementById('bet-desc').value.trim();
   const match=document.getElementById('bet-match').value;
