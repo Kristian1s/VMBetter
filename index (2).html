@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VM Betting 🍺</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green: #1D9E75;
+    --green-dark: #0F6E56;
+    --red: #E24B4A;
+    --red-dark: #A32D2D;
+    --amber: #EF9F27;
+    --bg: #0e1117;
+    --bg2: #181e27;
+    --bg3: #1e2636;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --text: #f0f4f8;
+    --text2: #8b97a8;
+    --text3: #4a5568;
+    --accent: #1D9E75;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; padding-bottom: 80px; }
+  header { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 1rem 1.25rem 0; position: sticky; top: 0; z-index: 100; }
+  .header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+  .logo { font-family: 'Bebas Neue', sans-serif; font-size: 26px; letter-spacing: 1px; color: var(--text); }
+  .logo span { color: var(--accent); }
+  .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text3); display: inline-block; margin-right: 5px; transition: background 0.3s; }
+  .sync-dot.live { background: var(--green); }
+  .sync-status { font-size: 12px; color: var(--text2); display: flex; align-items: center; }
+  .tabs { display: flex; }
+  .tab { flex: 1; padding: 10px 4px; font-size: 13px; font-family: 'DM Sans', sans-serif; font-weight: 500; cursor: pointer; border: none; background: none; color: var(--text2); border-bottom: 2px solid transparent; transition: color 0.15s, border-color 0.15s; text-align: center; }
+  .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  .main { padding: 1.25rem; max-width: 520px; margin: 0 auto; }
+  .section { display: none; }
+  .section.active { display: block; }
+  .card { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 1rem 1.1rem; margin-bottom: 12px; }
+  .card-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text3); margin-bottom: 12px; }
+  label { font-size: 13px; color: var(--text2); display: block; margin-bottom: 5px; }
+  input, textarea, select { width: 100%; padding: 10px 12px; font-size: 15px; font-family: 'DM Sans', sans-serif; border: 1px solid var(--border2); border-radius: 10px; background: var(--bg3); color: var(--text); outline: none; transition: border-color 0.15s; }
+  input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 64px; line-height: 1.5; }
+  select option { background: var(--bg3); }
+  .field { margin-bottom: 12px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .btn { padding: 11px 18px; border: 1px solid var(--border2); border-radius: 10px; background: var(--bg3); color: var(--text); cursor: pointer; font-size: 14px; font-family: 'DM Sans', sans-serif; font-weight: 500; transition: background 0.15s; }
+  .btn:hover { background: #2a3347; }
+  .btn-primary { background: var(--green); color: #fff; border-color: var(--green-dark); }
+  .btn-primary:hover { background: var(--green-dark); }
+  .btn-red { background: var(--red); color: #fff; border-color: var(--red-dark); }
+  .btn-red:hover { background: var(--red-dark); }
+  .btn-full { width: 100%; }
+  .btn-sm { padding: 6px 12px; font-size: 13px; border-radius: 8px; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+  .badge-open { background: rgba(29,158,117,0.15); color: #4ecfa0; }
+  .player-chip { display: inline-flex; align-items: center; gap: 5px; background: var(--bg3); border: 1px solid var(--border2); border-radius: 20px; padding: 5px 12px; font-size: 13px; margin: 3px; cursor: pointer; transition: background 0.12s, border-color 0.12s; color: var(--text2); }
+  .player-chip.selected { background: rgba(29,158,117,0.2); border-color: var(--green); color: #4ecfa0; }
+  .player-chip .remove { color: var(--text3); font-size: 16px; line-height: 1; }
+  .sip-badge { background: rgba(239,159,39,0.15); color: var(--amber); padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; }
+  .bet-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; padding: 1rem 1.1rem; margin-bottom: 10px; }
+  .bet-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+  .bet-desc { font-size: 16px; font-weight: 500; margin-bottom: 8px; line-height: 1.4; }
+  .bet-players { margin-bottom: 10px; }
+  .bet-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .score-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; margin-bottom: 16px; }
+  .score-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 1.1rem; border-bottom: 1px solid var(--border); }
+  .score-row:last-child { border-bottom: none; }
+  .score-rank { font-size: 22px; width: 32px; text-align: center; }
+  .score-name { font-size: 16px; font-weight: 500; flex: 1; margin-left: 10px; }
+  .score-val { font-family: 'Bebas Neue', sans-serif; font-size: 28px; letter-spacing: 1px; }
+  .score-val.pos { color: var(--green); }
+  .score-val.neg { color: var(--red); }
+  .score-label { font-size: 12px; color: var(--text2); text-align: right; }
+  .empty { color: var(--text3); font-size: 15px; text-align: center; padding: 3rem 0; }
+  .section-title { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 1px; margin-bottom: 1rem; color: var(--text); }
+  .history-item { font-size: 13px; color: var(--text2); padding: 5px 0; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+  .history-item:last-child { border-bottom: none; }
+  #toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%); background: var(--bg3); border: 1px solid var(--border2); color: var(--text); padding: 12px 22px; border-radius: 30px; font-size: 14px; z-index: 999; white-space: nowrap; max-width: 90vw; text-align: center; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-top">
+    <div class="logo">VM <span>BETTING</span> 🍺</div>
+    <div class="sync-status"><span class="sync-dot" id="sync-dot"></span><span id="sync-label">Kobler til...</span></div>
+  </div>
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('spillere')">Spillere</button>
+    <button class="tab" onclick="showTab('veddemaal')">+ Veddemål</button>
+    <button class="tab" onclick="showTab('aktive')">Aktive</button>
+    <button class="tab" onclick="showTab('poeng')">Poeng</button>
+  </div>
+</header>
+
+<div class="main">
+  <div class="section active" id="tab-spillere">
+    <div class="section-title">Spillere</div>
+    <div class="card">
+      <div class="row2" style="align-items:flex-end">
+        <div>
+          <label>Navn</label>
+          <input type="text" id="player-name" placeholder="f.eks. Anders" onkeydown="if(event.key==='Enter')addPlayer()">
+        </div>
+        <button class="btn btn-primary" onclick="addPlayer()">Legg til</button>
+      </div>
+    </div>
+    <div id="player-list-section"></div>
+  </div>
+
+  <div class="section" id="tab-veddemaal">
+    <div class="section-title">Nytt veddemål</div>
+    <div class="card">
+      <div class="field">
+        <label>Hva veddes det på?</label>
+        <textarea id="bet-desc" placeholder="f.eks. «Norge scorer innen 20 min»"></textarea>
+      </div>
+      <div class="row2 field">
+        <div>
+          <label>Kamp</label>
+          <select id="bet-match">
+            <option value="">Velg kamp...</option>
+            <option value="FRA–SEN">Frankrike – Senegal</option>
+            <option value="NOR–IRQ">Norge – Irak</option>
+          </select>
+        </div>
+        <div>
+          <label>Slurker (innsats)</label>
+          <input type="number" id="bet-sips" min="1" max="20" value="2">
+        </div>
+      </div>
+      <div class="field">
+        <label>Odds</label>
+        <select id="bet-odds">
+          <option value="1">1× — normal</option>
+          <option value="2">2× — dobbel</option>
+          <option value="3">3× — trippel</option>
+          <option value="0.5">0.5× — halv innsats</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Hvem vedder?</label>
+        <div id="bettor-select" style="margin-top:4px"></div>
+      </div>
+      <button class="btn btn-primary btn-full" style="margin-top:4px" onclick="addBet()">Legg inn veddemål</button>
+    </div>
+  </div>
+
+  <div class="section" id="tab-aktive">
+    <div class="section-title">Aktive veddemål</div>
+    <div id="bets-list"></div>
+  </div>
+
+  <div class="section" id="tab-poeng">
+    <div class="section-title">Poengtavle</div>
+    <div class="score-card" id="scoreboard"></div>
+    <div id="history-section"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase, ref, onValue, set, push, update, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyD5lE-c5gZrosPDxnUpEc2MalMawX4lN4U",
+  authDomain: "vmbetting-9eaff.firebaseapp.com",
+  databaseURL: "https://vmbetting-9eaff-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "vmbetting-9eaff",
+  storageBucket: "vmbetting-9eaff.firebasestorage.app",
+  messagingSenderId: "349618378088",
+  appId: "1:349618378088:web:be7d64cb173c5a833772dd"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+let players = {};
+let bets = {};
+let selectedBettors = new Set();
+let toastTimer;
+let currentTab = 'spillere';
+
+// Sync dot
+function setSync(live) {
+  document.getElementById('sync-dot').className = 'sync-dot' + (live ? ' live' : '');
+  document.getElementById('sync-label').textContent = live ? 'Live' : 'Kobler til...';
+}
+
+// Listen to players
+onValue(ref(db, 'players'), snap => {
+  players = snap.val() || {};
+  setSync(true);
+  renderPlayers();
+  renderBettorSelect();
+  updatePlayerCount();
+  if (currentTab === 'poeng') renderScore();
+});
+
+// Listen to bets
+onValue(ref(db, 'bets'), snap => {
+  bets = snap.val() || {};
+  if (currentTab === 'aktive') renderBets();
+  if (currentTab === 'poeng') renderScore();
+});
+
+function showTab(id) {
+  currentTab = id;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  const tabs = ['spillere','veddemaal','aktive','poeng'];
+  document.querySelectorAll('.tab')[tabs.indexOf(id)].classList.add('active');
+  if (id === 'veddemaal') renderBettorSelect();
+  if (id === 'aktive') renderBets();
+  if (id === 'poeng') renderScore();
+}
+window.showTab = showTab;
+
+function updatePlayerCount() {
+  const count = Object.keys(players).length;
+  document.getElementById('player-count') && (document.getElementById('player-count').textContent = count + ' spiller' + (count !== 1 ? 'e' : ''));
+}
+
+window.addPlayer = function() {
+  const inp = document.getElementById('player-name');
+  const name = inp.value.trim();
+  if (!name) return;
+  const exists = Object.values(players).some(p => p.name === name);
+  if (exists) { showToast('Spiller finnes allerede!'); return; }
+  const newRef = push(ref(db, 'players'));
+  set(newRef, { name, score: 0 });
+  inp.value = '';
+  inp.focus();
+};
+
+window.removePlayer = function(id) {
+  remove(ref(db, 'players/' + id));
+};
+
+function renderPlayers() {
+  const el = document.getElementById('player-list-section');
+  const list = Object.entries(players);
+  if (!list.length) { el.innerHTML = '<div class="empty">Ingen spillere enda</div>'; return; }
+  el.innerHTML = '<div class="card"><div class="card-label">Påmeldte</div><div>' +
+    list.map(([id, p]) =>
+      `<span class="player-chip">${p.name} <span class="remove" onclick="removePlayer('${id}')">×</span></span>`
+    ).join('') +
+    '</div><div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">' +
+    '<button class="btn btn-sm" style="color:var(--red);border-color:var(--red-dark)" onclick="resetAll()">Nullstill alt</button>' +
+    '</div></div>';
+}
+
+window.resetAll = function() {
+  if (!confirm('Er du sikker? Dette sletter alt.')) return;
+  remove(ref(db, 'players'));
+  remove(ref(db, 'bets'));
+  selectedBettors.clear();
+  showToast('Alt er nullstilt 🗑️');
+};
+
+function renderBettorSelect() {
+  const el = document.getElementById('bettor-select');
+  if (!el) return;
+  const list = Object.entries(players);
+  if (!list.length) { el.innerHTML = '<span style="font-size:13px;color:var(--text3)">Legg til spillere først</span>'; return; }
+  el.innerHTML = list.map(([id, p]) =>
+    `<span class="player-chip${selectedBettors.has(id) ? ' selected' : ''}" onclick="toggleBettor('${id}')">${p.name}</span>`
+  ).join('');
+}
+
+window.toggleBettor = function(id) {
+  if (selectedBettors.has(id)) selectedBettors.delete(id);
+  else selectedBettors.add(id);
+  renderBettorSelect();
+};
+
+window.addBet = function() {
+  const desc = document.getElementById('bet-desc').value.trim();
+  const match = document.getElementById('bet-match').value;
+  const sips = parseInt(document.getElementById('bet-sips').value) || 2;
+  const odds = parseFloat(document.getElementById('bet-odds').value) || 1;
+  if (!desc) { showToast('Beskriv veddemålet først! ✍️'); return; }
+  if (!selectedBettors.size) { showToast('Velg minst én spiller!'); return; }
+  const bettorNames = [...selectedBettors].map(id => players[id]?.name).filter(Boolean);
+  push(ref(db, 'bets'), {
+    desc, match, sips, odds,
+    bettorIds: [...selectedBettors],
+    bettorNames,
+    status: 'open',
+    createdAt: Date.now()
+  });
+  document.getElementById('bet-desc').value = '';
+  document.getElementById('bet-match').selectedIndex = 0;
+  document.getElementById('bet-sips').value = '2';
+  document.getElementById('bet-odds').value = '1';
+  selectedBettors.clear();
+  showToast('Veddemål lagt inn! 🎯');
+  showTab('aktive');
+};
+
+function renderBets() {
+  const el = document.getElementById('bets-list');
+  const open = Object.entries(bets).filter(([, b]) => b.status === 'open');
+  if (!open.length) { el.innerHTML = '<div class="empty">Ingen aktive veddemål 🍺</div>'; return; }
+  el.innerHTML = open.map(([id, b]) => `
+    <div class="bet-card">
+      <div class="bet-header">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="badge badge-open">Åpen</span>
+          ${b.match ? `<span style="font-size:12px;color:var(--text2)">${b.match}</span>` : ''}
+        </div>
+        <span class="sip-badge">${b.sips} slurk${b.sips > 1 ? 'er' : ''}${b.odds !== 1 ? ' × ' + b.odds : ''}</span>
+      </div>
+      <div class="bet-desc">${b.desc}</div>
+      <div class="bet-players">${(b.bettorNames || []).map(n => `<span class="player-chip" style="cursor:default">${n}</span>`).join('')}</div>
+      <div class="bet-actions">
+        <button class="btn btn-primary btn-sm" onclick="resolveBet('${id}','win')">Treffer ✓</button>
+        <button class="btn btn-red btn-sm" onclick="resolveBet('${id}','lose')">Bommet ✗</button>
+        <button class="btn btn-sm" onclick="deleteBet('${id}')">Slett</button>
+      </div>
+    </div>`).join('');
+}
+
+window.resolveBet = function(id, result) {
+  const bet = bets[id];
+  if (!bet) return;
+  const sipsActual = Math.round(bet.sips * bet.odds);
+  const delta = result === 'win' ? sipsActual : -sipsActual;
+  const updates = {};
+  updates['bets/' + id + '/status'] = result === 'win' ? 'won' : 'lost';
+  (bet.bettorIds || []).forEach(pid => {
+    if (players[pid] !== undefined) {
+      updates['players/' + pid + '/score'] = (players[pid].score || 0) + delta;
+    }
+  });
+  update(ref(db), updates);
+  if (result === 'win') showToast(`Treff! ${(bet.bettorNames||[]).join(', ')} slipper unna 🙌`);
+  else showToast(`Bom! ${(bet.bettorNames||[]).join(', ')} drikker ${sipsActual} slurk${sipsActual > 1 ? 'er' : ''}! 🍺`);
+};
+
+window.deleteBet = function(id) {
+  remove(ref(db, 'bets/' + id));
+};
+
+function renderScore() {
+  const el = document.getElementById('scoreboard');
+  const list = Object.entries(players);
+  if (!list.length) { el.innerHTML = '<div class="empty">Ingen spillere enda</div>'; return; }
+  const sorted = list.sort((a, b) => (b[1].score || 0) - (a[1].score || 0));
+  el.innerHTML = sorted.map(([, p], i) => {
+    const s = p.score || 0;
+    return `
+    <div class="score-row">
+      <div class="score-rank">${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i+1)}</div>
+      <div class="score-name">${p.name}</div>
+      <div style="text-align:right">
+        <div class="score-val ${s >= 0 ? 'pos' : 'neg'}">${s >= 0 ? '+' + s : s}</div>
+        <div class="score-label">${s >= 0 ? 'spart' : 'skyldig'} ${Math.abs(s)} slurk${Math.abs(s) !== 1 ? 'er' : ''}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const hist = Object.entries(bets).filter(([, b]) => b.status !== 'open');
+  const histEl = document.getElementById('history-section');
+  if (!hist.length) { histEl.innerHTML = ''; return; }
+  histEl.innerHTML = `
+    <div class="section-title" style="margin-top:1.5rem">Historikk</div>
+    <div class="card">
+      ${hist.map(([, b]) => `
+        <div class="history-item">
+          <span>${b.status === 'won' ? '✅' : '❌'}</span>
+          <span style="flex:1">${b.desc}</span>
+          <span style="color:var(--text3);font-size:12px">${(b.bettorNames||[]).join(', ')}</span>
+        </div>`).join('')}
+    </div>`;
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.opacity = '1';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.style.opacity = '0'; }, 3000);
+}
+
+// Missing player count element fix
+const header = document.querySelector('.header-top');
+const pc = document.createElement('div');
+pc.id = 'player-count';
+pc.style.cssText = 'font-size:13px;color:var(--text2);background:var(--bg3);border:1px solid var(--border);padding:4px 12px;border-radius:20px';
+pc.textContent = '0 spillere';
+header.appendChild(pc);
+
+</script>
+</body>
+</html>
