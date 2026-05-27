@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VM Betting 🍺</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --green:#1D9E75;--green-dark:#0F6E56;--green-light:rgba(29,158,117,0.15);
+  --red:#E24B4A;--red-dark:#A32D2D;--red-light:rgba(226,75,74,0.15);
+  --amber:#EF9F27;--amber-light:rgba(239,159,39,0.15);
+  --blue:#4A90D9;--blue-light:rgba(74,144,217,0.15);
+  --bg:#0e1117;--bg2:#181e27;--bg3:#1e2636;--bg4:#242f42;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
+  --text:#f0f4f8;--text2:#8b97a8;--text3:#4a5568;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;padding-bottom:90px}
+/* HEADER */
+header{background:var(--bg2);border-bottom:1px solid var(--border);padding:1rem 1.25rem 0;position:sticky;top:0;z-index:100}
+.header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:1px}
+.logo span{color:var(--green)}
+.sync-status{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--text3);transition:background .3s}
+.dot.live{background:var(--green)}
+.tabs{display:flex}
+.tab{flex:1;padding:9px 4px;font-size:13px;font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;border:none;background:none;color:var(--text2);border-bottom:2px solid transparent;text-align:center;transition:color .15s,border-color .15s}
+.tab.active{color:var(--text);border-bottom-color:var(--green)}
+/* MAIN */
+.main{padding:1.25rem;max-width:540px;margin:0 auto}
+.section{display:none}.section.active{display:block}
+.section-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;margin-bottom:1rem}
+/* CARDS */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:1rem 1.1rem;margin-bottom:12px}
+.card-label{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:10px}
+/* FORMS */
+label{font-size:13px;color:var(--text2);display:block;margin-bottom:4px}
+input,textarea,select{width:100%;padding:10px 12px;font-size:15px;font-family:'DM Sans',sans-serif;border:1px solid var(--border2);border-radius:10px;background:var(--bg3);color:var(--text);outline:none;transition:border-color .15s}
+input:focus,textarea:focus,select:focus{border-color:var(--green)}
+textarea{resize:vertical;min-height:60px;line-height:1.5}
+select option{background:var(--bg3)}
+.field{margin-bottom:12px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+/* BUTTONS */
+.btn{padding:10px 16px;border:1px solid var(--border2);border-radius:10px;background:var(--bg3);color:var(--text);cursor:pointer;font-size:14px;font-family:'DM Sans',sans-serif;font-weight:500;transition:background .15s}
+.btn:hover{background:var(--bg4)}
+.btn-primary{background:var(--green);color:#fff;border-color:var(--green-dark)}
+.btn-primary:hover{background:var(--green-dark)}
+.btn-red{background:var(--red);color:#fff;border-color:var(--red-dark)}
+.btn-red:hover{background:var(--red-dark)}
+.btn-full{width:100%}
+.btn-sm{padding:6px 12px;font-size:13px;border-radius:8px}
+/* BADGES */
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600}
+.badge-open{background:var(--green-light);color:#4ecfa0}
+.badge-won{background:var(--green-light);color:#4ecfa0}
+.badge-lost{background:var(--red-light);color:#f08080}
+/* CHIPS */
+.chip{display:inline-flex;align-items:center;gap:5px;background:var(--bg3);border:1px solid var(--border2);border-radius:20px;padding:5px 12px;font-size:13px;margin:3px;cursor:pointer;transition:background .12s,border-color .12s;color:var(--text2)}
+.chip.selected{background:var(--green-light);border-color:var(--green);color:#4ecfa0}
+/* AVATARS */
+.avatar{width:44px;height:44px;border-radius:50%;object-fit:cover;border:2px solid var(--border2);background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:18px;overflow:hidden;flex-shrink:0}
+.avatar img{width:100%;height:100%;object-fit:cover}
+/* PLAYER ROW */
+.player-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+.player-row:last-child{border-bottom:none}
+.player-info{flex:1}
+.player-name{font-size:15px;font-weight:500}
+.player-sub{font-size:12px;color:var(--text2)}
+/* BET CARDS */
+.bet-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:1rem 1.1rem;margin-bottom:10px}
+.bet-header{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px}
+.bet-desc{font-size:16px;font-weight:500;margin-bottom:8px;line-height:1.4}
+.sip-badge{background:var(--amber-light);color:var(--amber);padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600}
+/* SCORE */
+.score-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:16px}
+.score-row{display:flex;align-items:center;padding:12px 1.1rem;border-bottom:1px solid var(--border)}
+.score-row:last-child{border-bottom:none}
+.score-rank{font-size:22px;width:34px;text-align:center}
+.score-name{font-size:15px;font-weight:500;flex:1;margin-left:10px}
+.score-val{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:1px;text-align:right}
+.score-val.pos{color:var(--green)}
+.score-val.neg{color:var(--red)}
+.score-sub{font-size:12px;color:var(--text2);text-align:right}
+/* TIPPING */
+.tip-option{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border2);border-radius:10px;margin-bottom:8px;cursor:pointer;transition:border-color .15s,background .15s}
+.tip-option.selected{border-color:var(--green);background:var(--green-light)}
+.tip-option input[type=radio]{display:none}
+.tip-label{font-size:15px;font-weight:500}
+.tip-sub{font-size:12px;color:var(--text2)}
+/* LIVE SCORE BOX */
+.live-box{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;padding:1rem;margin-bottom:12px;text-align:center}
+.live-teams{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:6px}
+.live-team{font-size:14px;font-weight:500;flex:1}
+.live-team.right{text-align:right}
+.live-score{font-family:'Bebas Neue',sans-serif;font-size:42px;letter-spacing:2px;color:var(--text);line-height:1}
+.live-status{font-size:12px;color:var(--text2);margin-top:4px}
+.live-badge{display:inline-block;background:var(--red);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;margin-right:6px;animation:pulse 1.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+/* PODIUM (PC VIEW) */
+.podium-wrap{display:none}
+/* TOAST */
+#toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:12px 22px;border-radius:30px;font-size:14px;z-index:999;max-width:90vw;text-align:center;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap}
+/* MISC */
+.empty{color:var(--text3);font-size:15px;text-align:center;padding:2.5rem 0}
+.divider{height:1px;background:var(--border);margin:12px 0}
+.history-item{font-size:13px;color:var(--text2);padding:5px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.history-item:last-child{border-bottom:none}
+.hub-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px}
+.hub-btn{padding:12px 8px;border:1px solid var(--border2);border-radius:10px;background:var(--bg3);color:var(--text);cursor:pointer;font-size:15px;font-weight:600;text-align:center;transition:all .15s}
+.hub-btn.selected{border-color:var(--green);background:var(--green-light);color:#4ecfa0}
+.score-input-row{display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:12px}
+.score-input-row input{width:64px;text-align:center;font-size:22px;font-weight:600;padding:10px 6px}
+.score-sep{font-size:22px;font-weight:700;color:var(--text2)}
+.bonus-section{margin-top:4px}
+.bonus-label{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:6px;display:block}
+.bonus-opts{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.bonus-opt{padding:7px 14px;border:1px solid var(--border2);border-radius:20px;background:var(--bg3);color:var(--text2);cursor:pointer;font-size:13px;transition:all .15s}
+.bonus-opt.selected{border-color:var(--blue);background:var(--blue-light);color:#79b4f0}
+.points-pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;background:var(--amber-light);color:var(--amber);margin-left:6px}
+/* AVATAR UPLOAD */
+.avatar-upload{position:relative;cursor:pointer}
+.avatar-upload input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.avatar-edit-icon{position:absolute;bottom:0;right:0;background:var(--green);color:#fff;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-top">
+    <div class="logo">VM <span>BETTING</span> 🍺</div>
+    <div class="sync-status">
+      <span class="dot" id="sync-dot"></span>
+      <span id="sync-label">Kobler til...</span>
+      <span id="live-match-badge" style="display:none;margin-left:6px"></span>
+    </div>
+  </div>
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('spillere')">Spillere</button>
+    <button class="tab" onclick="showTab('tipping')">Tipping</button>
+    <button class="tab" onclick="showTab('betting')">Betting</button>
+    <button class="tab" onclick="showTab('poeng')">Poeng</button>
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- ===== SPILLERE ===== -->
+  <div class="section active" id="tab-spillere">
+    <div class="section-title">Spillere</div>
+    <div class="card">
+      <div class="field">
+        <label>Navn</label>
+        <input type="text" id="player-name" placeholder="f.eks. Anders" onkeydown="if(event.key==='Enter')addPlayer()">
+      </div>
+      <button class="btn btn-primary btn-full" onclick="addPlayer()">Legg til spiller</button>
+    </div>
+    <div id="player-list"></div>
+    <div id="reset-btn-wrap"></div>
+  </div>
+
+  <!-- ===== TIPPING ===== -->
+  <div class="section" id="tab-tipping">
+    <div class="section-title">Tipping</div>
+
+    <!-- Live score -->
+    <div id="live-score-box"></div>
+
+    <!-- Kamp velger -->
+    <div class="card">
+      <div class="field">
+        <label>Velg kamp å tippe på</label>
+        <select id="tip-match-select" onchange="renderTipForm()">
+          <option value="">Velg kamp...</option>
+          <option value="FRA-SEN">Frankrike – Senegal</option>
+          <option value="NOR-IRQ">Norge – Irak</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Hvem tipper?</label>
+        <select id="tip-player-select">
+          <option value="">Velg spiller...</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="tip-form"></div>
+  </div>
+
+  <!-- ===== BETTING ===== -->
+  <div class="section" id="tab-betting">
+    <div class="section-title">Slurke-betting</div>
+
+    <div class="card" id="new-bet-form">
+      <div class="field">
+        <label>Hva veddes det på?</label>
+        <textarea id="bet-desc" placeholder="f.eks. «Norge scorer innen 20 min»"></textarea>
+      </div>
+      <div class="row2 field">
+        <div>
+          <label>Kamp</label>
+          <select id="bet-match">
+            <option value="">Velg kamp...</option>
+            <option value="FRA–SEN">Frankrike – Senegal</option>
+            <option value="NOR–IRQ">Norge – Irak</option>
+          </select>
+        </div>
+        <div>
+          <label>Slurker</label>
+          <input type="number" id="bet-sips" min="1" max="20" value="2">
+        </div>
+      </div>
+      <div class="field">
+        <label>Odds</label>
+        <select id="bet-odds">
+          <option value="1">1× — normal</option>
+          <option value="2">2× — dobbel</option>
+          <option value="3">3× — trippel</option>
+          <option value="0.5">0.5× — halv</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Hvem vedder?</label>
+        <div id="bettor-select" style="margin-top:4px"></div>
+      </div>
+      <button class="btn btn-primary btn-full" onclick="addBet()">Legg inn veddemål</button>
+    </div>
+
+    <div class="section-title" style="margin-top:1rem">Aktive veddemål</div>
+    <div id="bets-list"></div>
+  </div>
+
+  <!-- ===== POENG ===== -->
+  <div class="section" id="tab-poeng">
+    <div class="section-title">Poengtavle</div>
+    <div id="scoreboard"></div>
+    <div id="history-section"></div>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase, ref, onValue, set, push, update, remove, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyD5lE-c5gZrosPDxnUpEc2MalMawX4lN4U",
+  authDomain: "vmbetting-9eaff.firebaseapp.com",
+  databaseURL: "https://vmbetting-9eaff-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "vmbetting-9eaff",
+  storageBucket: "vmbetting-9eaff.firebasestorage.app",
+  messagingSenderId: "349618378088",
+  appId: "1:349618378088:web:be7d64cb173c5a833772dd"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+const RAPID_KEY = "86b71ea67bmsh076351ff0c7fb59p12fb39jsnb660034bd93f";
+
+// Match config: legg til fixture IDs fra API-Football når kampene er kjente
+const MATCHES = {
+  "FRA-SEN": { label: "Frankrike – Senegal", home: "Frankrike", away: "Senegal", fixtureId: null },
+  "NOR-IRQ": { label: "Norge – Irak", home: "Norge", away: "Irak", fixtureId: null }
+};
+
+// ===================== STATE =====================
+let players = {};
+let bets = {};
+let tips = {};
+let selectedBettors = new Set();
+let currentTab = 'spillere';
+let liveScores = {};
+let toastTimer;
+let tipForm = { hub: null, homeGoals: '', awayGoals: '', firstScorer: null, redCard: null, firstHalfGoal: null };
+
+// ===================== FIREBASE LISTENERS =====================
+onValue(ref(db, 'players'), snap => {
+  players = snap.val() || {};
+  setSync(true);
+  renderPlayers();
+  renderBettorSelect();
+  renderPlayerSelects();
+  if (currentTab === 'poeng') renderScore();
+});
+onValue(ref(db, 'bets'), snap => {
+  bets = snap.val() || {};
+  if (currentTab === 'betting') renderBets();
+  if (currentTab === 'poeng') renderScore();
+});
+onValue(ref(db, 'tips'), snap => {
+  tips = snap.val() || {};
+  if (currentTab === 'poeng') renderScore();
+});
+
+// ===================== SYNC DOT =====================
+function setSync(live) {
+  document.getElementById('sync-dot').className = 'dot' + (live ? ' live' : '');
+  document.getElementById('sync-label').textContent = live ? 'Live' : 'Kobler til...';
+}
+
+// ===================== TAB =====================
+window.showTab = function(id) {
+  currentTab = id;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  ['spillere','tipping','betting','poeng'].forEach((t,i) => {
+    document.querySelectorAll('.tab')[i].classList.toggle('active', t === id);
+  });
+  if (id === 'tipping') { renderPlayerSelects(); renderLiveScoreBox(); }
+  if (id === 'betting') { renderBets(); renderBettorSelect(); }
+  if (id === 'poeng') renderScore();
+};
+
+// ===================== PLAYERS =====================
+window.addPlayer = function() {
+  const inp = document.getElementById('player-name');
+  const name = inp.value.trim();
+  if (!name) return;
+  if (Object.values(players).some(p => p.name === name)) { showToast('Spiller finnes allerede!'); return; }
+  const newRef = push(ref(db, 'players'));
+  set(newRef, { name, tipPoints: 0, sipScore: 0, avatar: null });
+  inp.value = ''; inp.focus();
+};
+
+window.removePlayer = function(id) {
+  if (confirm('Fjern spiller?')) remove(ref(db, 'players/' + id));
+};
+
+window.uploadAvatar = function(id, input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) { showToast('Bilde er for stort (maks 2MB)'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    update(ref(db, 'players/' + id), { avatar: e.target.result });
+    showToast('Avatar oppdatert! 📸');
+  };
+  reader.readAsDataURL(file);
+};
+
+function avatarEl(player, id, editable = false) {
+  const hasAvatar = player.avatar && player.avatar.startsWith('data:');
+  const inner = hasAvatar
+    ? `<img src="${player.avatar}" alt="${player.name}">`
+    : `<span>${player.name.charAt(0).toUpperCase()}</span>`;
+  if (!editable) return `<div class="avatar">${inner}</div>`;
+  return `
+    <div class="avatar avatar-upload">
+      ${inner}
+      <div class="avatar-edit-icon">✎</div>
+      <input type="file" accept="image/*" capture="user" onchange="uploadAvatar('${id}', this)">
+    </div>`;
+}
+
+function renderPlayers() {
+  const el = document.getElementById('player-list');
+  const list = Object.entries(players);
+  if (!list.length) { el.innerHTML = '<div class="empty">Ingen spillere enda</div>'; return; }
+  el.innerHTML = '<div class="card">' + list.map(([id, p]) => `
+    <div class="player-row">
+      ${avatarEl(p, id, true)}
+      <div class="player-info">
+        <div class="player-name">${p.name}</div>
+        <div class="player-sub">Trykk på avatar for å laste opp bilde 📸</div>
+      </div>
+      <button class="btn btn-sm" style="color:var(--red)" onclick="removePlayer('${id}')">×</button>
+    </div>`).join('') + '</div>';
+
+  const rw = document.getElementById('reset-btn-wrap');
+  rw.innerHTML = `<button class="btn btn-sm btn-full" style="color:var(--red);border-color:var(--red-dark);margin-top:4px" onclick="resetAll()">🗑️ Nullstill alt</button>`;
+}
+
+window.resetAll = function() {
+  if (!confirm('Sletter alle spillere, tips og veddemål. Sikker?')) return;
+  remove(ref(db, 'players'));
+  remove(ref(db, 'bets'));
+  remove(ref(db, 'tips'));
+  showToast('Alt nullstilt 🗑️');
+};
+
+function renderPlayerSelects() {
+  const sel = document.getElementById('tip-player-select');
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Velg spiller...</option>' +
+    Object.entries(players).map(([id, p]) => `<option value="${id}">${p.name}</option>`).join('');
+  if (cur) sel.value = cur;
+}
+
+function renderBettorSelect() {
+  const el = document.getElementById('bettor-select');
+  if (!el) return;
+  const list = Object.entries(players);
+  if (!list.length) { el.innerHTML = '<span style="font-size:13px;color:var(--text3)">Legg til spillere først</span>'; return; }
+  el.innerHTML = list.map(([id, p]) =>
+    `<span class="chip${selectedBettors.has(id) ? ' selected' : ''}" onclick="toggleBettor('${id}')">${p.name}</span>`
+  ).join('');
+}
+
+window.toggleBettor = function(id) {
+  selectedBettors.has(id) ? selectedBettors.delete(id) : selectedBettors.add(id);
+  renderBettorSelect();
+};
+
+// ===================== LIVE SCORE API =====================
+async function fetchLiveScore(fixtureId) {
+  if (!fixtureId) return null;
+  try {
+    const res = await fetch(`https://v3.football.api-sports.io/fixtures?id=${fixtureId}`, {
+      headers: { 'x-rapidapi-key': RAPID_KEY, 'x-rapidapi-host': 'v3.football.api-sports.io' }
+    });
+    const data = await res.json();
+    const fix = data.response?.[0];
+    if (!fix) return null;
+    return {
+      home: fix.teams.home.name,
+      away: fix.teams.away.name,
+      homeGoals: fix.goals.home ?? '-',
+      awayGoals: fix.goals.away ?? '-',
+      status: fix.fixture.status.short,
+      elapsed: fix.fixture.status.elapsed,
+      events: fix.events || []
+    };
+  } catch { return null; }
+}
+
+async function refreshLiveScores() {
+  for (const [key, match] of Object.entries(MATCHES)) {
+    if (match.fixtureId) {
+      const score = await fetchLiveScore(match.fixtureId);
+      if (score) liveScores[key] = score;
+    }
+  }
+  renderLiveScoreBox();
+  // Check for auto-resolve
+  for (const [key, score] of Object.entries(liveScores)) {
+    if (score.status === 'FT') autoResolveTips(key, score);
+  }
+}
+
+function renderLiveScoreBox() {
+  const el = document.getElementById('live-score-box');
+  if (!el) return;
+  const matchKey = document.getElementById('tip-match-select')?.value;
+  const score = matchKey ? liveScores[matchKey] : null;
+  if (!score) {
+    const match = matchKey ? MATCHES[matchKey] : null;
+    el.innerHTML = match ? `
+      <div class="live-box">
+        <div style="font-size:13px;color:var(--text2);margin-bottom:4px">${match.label}</div>
+        <div style="color:var(--text3);font-size:14px">Ingen live data ennå</div>
+      </div>` : '';
+    return;
+  }
+  const isLive = ['1H','HT','2H','ET','BT','P'].includes(score.status);
+  const isFT = score.status === 'FT';
+  el.innerHTML = `
+    <div class="live-box">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:8px">
+        ${isLive ? '<span class="live-badge">LIVE</span>' : ''}
+        ${isFT ? '✅ Fullspilt' : ''}
+        ${score.elapsed ? score.elapsed + "'" : ''}
+      </div>
+      <div class="live-teams">
+        <div class="live-team">${score.home}</div>
+        <div class="live-score">${score.homeGoals} – ${score.awayGoals}</div>
+        <div class="live-team right">${score.away}</div>
+      </div>
+    </div>`;
+}
+
+// Poll live scores every 60 seconds
+refreshLiveScores();
+setInterval(refreshLiveScores, 60000);
+
+// ===================== TIPPING =====================
+window.renderTipForm = function() {
+  const matchKey = document.getElementById('tip-match-select').value;
+  renderLiveScoreBox();
+  const el = document.getElementById('tip-form');
+  if (!matchKey) { el.innerHTML = ''; return; }
+  const match = MATCHES[matchKey];
+  tipForm = { hub: null, homeGoals: '', awayGoals: '', firstScorer: null, redCard: null, firstHalfGoal: null };
+
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-label">Utfall (3 poeng)</div>
+      <div class="hub-row">
+        <div class="hub-btn" id="hub-H" onclick="selectHub('H','${matchKey}')">H<br><small style="font-size:11px;color:var(--text2)">${match.home}</small></div>
+        <div class="hub-btn" id="hub-U" onclick="selectHub('U','${matchKey}')">U<br><small style="font-size:11px;color:var(--text2)">Uavgjort</small></div>
+        <div class="hub-btn" id="hub-B" onclick="selectHub('B','${matchKey}')">B<br><small style="font-size:11px;color:var(--text2)">${match.away}</small></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Stillingen (3+3 poeng)</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Rett målforskjell = +3p. Eksakt stilling = +3p ekstra.</div>
+      <div class="score-input-row">
+        <input type="number" id="tip-home-goals" min="0" max="20" placeholder="0" oninput="tipForm.homeGoals=this.value">
+        <span class="score-sep">–</span>
+        <input type="number" id="tip-away-goals" min="0" max="20" placeholder="0" oninput="tipForm.awayGoals=this.value">
+      </div>
+      <div style="text-align:center;font-size:12px;color:var(--text2)">${match.home} – ${match.away}</div>
+    </div>
+
+    <div class="card bonus-section">
+      <div class="card-label">Bonusspørsmål (2 poeng hver)</div>
+
+      <span class="bonus-label">⚽ Første lag som scorer</span>
+      <div class="bonus-opts">
+        <div class="bonus-opt" id="fs-H" onclick="selectBonus('firstScorer','H',this)">${match.home}</div>
+        <div class="bonus-opt" id="fs-A" onclick="selectBonus('firstScorer','A',this)">${match.away}</div>
+        <div class="bonus-opt" id="fs-N" onclick="selectBonus('firstScorer','N',this)">Ingen mål</div>
+      </div>
+
+      <span class="bonus-label">🔴 Rødt kort i kampen?</span>
+      <div class="bonus-opts">
+        <div class="bonus-opt" id="rc-Y" onclick="selectBonus('redCard','Y',this)">Ja</div>
+        <div class="bonus-opt" id="rc-N" onclick="selectBonus('redCard','N',this)">Nei</div>
+      </div>
+
+      <span class="bonus-label">⏱️ Mål i 1. omgang?</span>
+      <div class="bonus-opts">
+        <div class="bonus-opt" id="fhg-Y" onclick="selectBonus('firstHalfGoal','Y',this)">Ja</div>
+        <div class="bonus-opt" id="fhg-N" onclick="selectBonus('firstHalfGoal','N',this)">Nei</div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary btn-full" onclick="submitTip('${matchKey}')">Send inn tipp 🎯</button>
+    <div id="tip-status" style="margin-top:10px"></div>
+  `;
+};
+
+window.selectHub = function(val) {
+  tipForm.hub = val;
+  ['H','U','B'].forEach(v => document.getElementById('hub-'+v)?.classList.toggle('selected', v === val));
+};
+
+window.selectBonus = function(field, val, el) {
+  tipForm[field] = val;
+  const prefix = { firstScorer: 'fs', redCard: 'rc', firstHalfGoal: 'fhg' }[field];
+  document.querySelectorAll(`[id^="${prefix}-"]`).forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+};
+
+window.submitTip = function(matchKey) {
+  const playerId = document.getElementById('tip-player-select').value;
+  if (!playerId) { showToast('Velg spiller først!'); return; }
+  if (!tipForm.hub) { showToast('Velg utfall (H/U/B)!'); return; }
+  if (tipForm.homeGoals === '' || tipForm.awayGoals === '') { showToast('Fyll inn stillingen!'); return; }
+  if (!tipForm.firstScorer || !tipForm.redCard || !tipForm.firstHalfGoal) { showToast('Svar på alle bonusspørsmål!'); return; }
+
+  // Check if already tipped this match
+  const existingKey = Object.keys(tips).find(k => tips[k].playerId === playerId && tips[k].matchKey === matchKey);
+  const tipData = {
+    playerId,
+    playerName: players[playerId]?.name || '',
+    matchKey,
+    matchLabel: MATCHES[matchKey]?.label || matchKey,
+    hub: tipForm.hub,
+    homeGoals: parseInt(tipForm.homeGoals),
+    awayGoals: parseInt(tipForm.awayGoals),
+    firstScorer: tipForm.firstScorer,
+    redCard: tipForm.redCard,
+    firstHalfGoal: tipForm.firstHalfGoal,
+    points: null,
+    resolved: false,
+    createdAt: Date.now()
+  };
+
+  if (existingKey) {
+    update(ref(db, 'tips/' + existingKey), tipData);
+    showToast('Tipp oppdatert! 🎯');
+  } else {
+    push(ref(db, 'tips'), tipData);
+    showToast('Tipp sendt inn! 🎯');
+  }
+
+  document.getElementById('tip-status').innerHTML = `
+    <div class="card" style="text-align:center;padding:.75rem">
+      <div style="font-size:14px;font-weight:500;color:#4ecfa0">✅ Tipp registrert!</div>
+      <div style="font-size:13px;color:var(--text2);margin-top:4px">
+        ${MATCHES[matchKey]?.home} ${tipData.homeGoals}–${tipData.awayGoals} ${MATCHES[matchKey]?.away} | ${tipData.hub}
+      </div>
+    </div>`;
+};
+
+// ===================== AUTO RESOLVE TIPS =====================
+async function autoResolveTips(matchKey, score) {
+  const matchTips = Object.entries(tips).filter(([, t]) => t.matchKey === matchKey && !t.resolved);
+  if (!matchTips.length) return;
+
+  // Determine actual results from events
+  const events = score.events || [];
+  const firstGoalEvent = events.find(e => e.type === 'Goal');
+  const hasRedCard = events.some(e => e.type === 'Card' && e.detail === 'Red Card');
+  const firstHalfGoal = events.some(e => e.type === 'Goal' && e.time.elapsed <= 45);
+
+  let actualFirstScorer = 'N';
+  if (firstGoalEvent) {
+    const match = MATCHES[matchKey];
+    actualFirstScorer = firstGoalEvent.team.name.toLowerCase().includes(match.home.toLowerCase()) ? 'H' : 'A';
+  }
+
+  const actualHub = score.homeGoals > score.awayGoals ? 'H' : score.homeGoals < score.awayGoals ? 'B' : 'U';
+  const actualDiff = score.homeGoals - score.awayGoals;
+
+  const updates = {};
+  for (const [tipId, tip] of matchTips) {
+    let pts = 0;
+    if (tip.hub === actualHub) pts += 3;
+    const tipDiff = tip.homeGoals - tip.awayGoals;
+    if (tipDiff === actualDiff) pts += 3;
+    if (tip.homeGoals === score.homeGoals && tip.awayGoals === score.awayGoals) pts += 3;
+    if (tip.firstScorer === actualFirstScorer) pts += 2;
+    if ((tip.redCard === 'Y') === hasRedCard) pts += 2;
+    if ((tip.firstHalfGoal === 'Y') === firstHalfGoal) pts += 2;
+
+    updates[`tips/${tipId}/points`] = pts;
+    updates[`tips/${tipId}/resolved`] = true;
+    const curPts = players[tip.playerId]?.tipPoints || 0;
+    updates[`players/${tip.playerId}/tipPoints`] = curPts + pts;
+  }
+  if (Object.keys(updates).length) {
+    update(ref(db), updates);
+    showToast('Kampen er ferdig! Poeng regnet ut 🏆');
+  }
+}
+
+// ===================== MANUAL RESOLVE TIPS =====================
+window.manualResolveTips = async function(matchKey) {
+  const hg = parseInt(prompt(`${MATCHES[matchKey].home} mål?`));
+  const ag = parseInt(prompt(`${MATCHES[matchKey].away} mål?`));
+  const fs = prompt('Første lag å score? H = hjemme, A = borte, N = ingen mål').toUpperCase();
+  const rc = prompt('Rødt kort? J/N').toUpperCase() === 'J';
+  const fhg = prompt('Mål i 1. omgang? J/N').toUpperCase() === 'J';
+  if (isNaN(hg) || isNaN(ag)) { showToast('Ugyldig input'); return; }
+
+  const actualHub = hg > ag ? 'H' : hg < ag ? 'B' : 'U';
+  const actualDiff = hg - ag;
+  const matchTips = Object.entries(tips).filter(([, t]) => t.matchKey === matchKey && !t.resolved);
+  const updates = {};
+
+  for (const [tipId, tip] of matchTips) {
+    let pts = 0;
+    if (tip.hub === actualHub) pts += 3;
+    if ((tip.homeGoals - tip.awayGoals) === actualDiff) pts += 3;
+    if (tip.homeGoals === hg && tip.awayGoals === ag) pts += 3;
+    if (tip.firstScorer === fs) pts += 2;
+    if ((tip.redCard === 'Y') === rc) pts += 2;
+    if ((tip.firstHalfGoal === 'Y') === fhg) pts += 2;
+    updates[`tips/${tipId}/points`] = pts;
+    updates[`tips/${tipId}/resolved`] = true;
+    updates[`players/${tip.playerId}/tipPoints`] = (players[tip.playerId]?.tipPoints || 0) + pts;
+  }
+  update(ref(db), updates);
+  showToast('Poeng regnet ut! 🏆');
+};
+
+// ===================== BETTING =====================
+window.addBet = function() {
+  const desc = document.getElementById('bet-desc').value.trim();
+  const match = document.getElementById('bet-match').value;
+  const sips = parseInt(document.getElementById('bet-sips').value) || 2;
+  const odds = parseFloat(document.getElementById('bet-odds').value) || 1;
+  if (!desc) { showToast('Beskriv veddemålet! ✍️'); return; }
+  if (!selectedBettors.size) { showToast('Velg minst én spiller!'); return; }
+  const bettorIds = [...selectedBettors];
+  const bettorNames = bettorIds.map(id => players[id]?.name).filter(Boolean);
+  push(ref(db, 'bets'), { desc, match, sips, odds, bettorIds, bettorNames, status: 'open', createdAt: Date.now() });
+  document.getElementById('bet-desc').value = '';
+  document.getElementById('bet-match').selectedIndex = 0;
+  document.getElementById('bet-sips').value = '2';
+  document.getElementById('bet-odds').value = '1';
+  selectedBettors.clear();
+  showToast('Veddemål lagt inn! 🎯');
+  renderBets();
+};
+
+function renderBets() {
+  const el = document.getElementById('bets-list');
+  const open = Object.entries(bets).filter(([, b]) => b.status === 'open');
+  if (!open.length) { el.innerHTML = '<div class="empty">Ingen aktive veddemål 🍺</div>'; return; }
+  el.innerHTML = open.map(([id, b]) => `
+    <div class="bet-card">
+      <div class="bet-header">
+        <div><span class="badge badge-open">Åpen</span>${b.match ? ` <span style="font-size:12px;color:var(--text2)">${b.match}</span>` : ''}</div>
+        <span class="sip-badge">${b.sips} slurk${b.sips>1?'er':''}${b.odds!==1?' ×'+b.odds:''}</span>
+      </div>
+      <div class="bet-desc">${b.desc}</div>
+      <div style="margin-bottom:10px">${(b.bettorNames||[]).map(n=>`<span class="chip" style="cursor:default">${n}</span>`).join('')}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" onclick="resolveBet('${id}','win')">Treffer ✓</button>
+        <button class="btn btn-red btn-sm" onclick="resolveBet('${id}','lose')">Bommet ✗</button>
+        <button class="btn btn-sm" onclick="deleteBet('${id}')">Slett</button>
+      </div>
+    </div>`).join('');
+}
+
+window.resolveBet = function(id, result) {
+  const bet = bets[id]; if (!bet) return;
+  const sipsActual = Math.round(bet.sips * bet.odds);
+  const delta = result === 'win' ? sipsActual : -sipsActual;
+  const upd = { [`bets/${id}/status`]: result === 'win' ? 'won' : 'lost' };
+  (bet.bettorIds || []).forEach(pid => {
+    if (players[pid]) upd[`players/${pid}/sipScore`] = (players[pid].sipScore || 0) + delta;
+  });
+  update(ref(db), upd);
+  showToast(result === 'win'
+    ? `Treff! ${(bet.bettorNames||[]).join(', ')} slipper unna 🙌`
+    : `Bom! ${(bet.bettorNames||[]).join(', ')} drikker ${sipsActual} slurk${sipsActual>1?'er':''}! 🍺`);
+};
+
+window.deleteBet = function(id) { remove(ref(db, 'bets/' + id)); };
+
+// ===================== SCOREBOARD =====================
+function renderScore() {
+  const el = document.getElementById('scoreboard');
+  const list = Object.entries(players);
+  if (!list.length) { el.innerHTML = '<div class="empty">Ingen spillere enda</div>'; return; }
+
+  const sorted = list.sort((a, b) => {
+    const ta = (b[1].tipPoints||0) + (b[1].sipScore||0);
+    const tb = (a[1].tipPoints||0) + (a[1].sipScore||0);
+    return ta - tb;
+  });
+
+  el.innerHTML = '<div class="score-card">' + sorted.map(([id, p], i) => {
+    const tip = p.tipPoints || 0;
+    const sip = p.sipScore || 0;
+    const total = tip + sip;
+    return `
+      <div class="score-row">
+        <div class="score-rank">${['🥇','🥈','🥉'][i] || (i+1)}</div>
+        ${avatarEl(p, id)}
+        <div class="score-name">${p.name}</div>
+        <div>
+          <div class="score-val ${total>=0?'pos':'neg'}">${total>0?'+':''}${total}</div>
+          <div class="score-sub">🎯${tip}p  🍺${sip>=0?'+':''}${sip}</div>
+        </div>
+      </div>`;
+  }).join('') + '</div>';
+
+  // Admin resolve buttons
+  const histEl = document.getElementById('history-section');
+  const matchesWithTips = [...new Set(Object.values(tips).map(t => t.matchKey))];
+  const unresolved = matchesWithTips.filter(mk => Object.values(tips).some(t => t.matchKey === mk && !t.resolved));
+  if (unresolved.length) {
+    histEl.innerHTML = `
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-label">📋 Fasit (admin)</div>
+        ${unresolved.map(mk => `
+          <button class="btn btn-sm btn-full" style="margin-bottom:8px" onclick="manualResolveTips('${mk}')">
+            Registrer fasit: ${MATCHES[mk]?.label || mk}
+          </button>`).join('')}
+      </div>`;
+  }
+
+  // Tips overview
+  const tipList = Object.values(tips);
+  if (tipList.length) {
+    const byMatch = {};
+    tipList.forEach(t => { if (!byMatch[t.matchKey]) byMatch[t.matchKey] = []; byMatch[t.matchKey].push(t); });
+    histEl.innerHTML = (histEl.innerHTML || '') + Object.entries(byMatch).map(([mk, ts]) => `
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-label">${MATCHES[mk]?.label || mk}</div>
+        ${ts.map(t => `
+          <div class="history-item">
+            <span>${t.resolved ? (t.points >= 7 ? '🏆' : t.points >= 4 ? '✅' : '🟡') : '⏳'}</span>
+            <span style="flex:1">${t.playerName}: ${MATCHES[mk]?.home||'H'} ${t.homeGoals}–${t.awayGoals} ${MATCHES[mk]?.away||'A'} (${t.hub})</span>
+            <span style="color:var(--amber);font-weight:600">${t.resolved ? t.points+'p' : '?'}</span>
+          </div>`).join('')}
+      </div>`).join('');
+  }
+}
+
+// ===================== TOAST =====================
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.opacity = '1';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.style.opacity = '0', 3000);
+}
+window.showToast = showToast;
+
+</script>
+</body>
+</html>
