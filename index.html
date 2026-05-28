@@ -275,11 +275,10 @@ select option{background:var(--bg3)}
     <!-- Step 1: pick match -->
     <div class="card">
       <div class="field"><label>Velg kamp</label>
-        <select id="bet-match-sel" onchange="renderBetCatalog()">
-          <option value="">Velg kamp...</option>
-          <option value="FRA-SEN">Frankrike – Senegal</option>
-          <option value="NOR-IRQ">Norge – Irak</option>
-        </select>
+        <div class="hub-row" style="grid-template-columns:1fr 1fr">
+          <div class="hub-btn" id="bet-match-btn-FRA-SEN" onclick="selectBetMatch('FRA-SEN')">🇫🇷 vs 🇸🇳<br><small style="font-size:11px;opacity:.7">Frankrike – Senegal</small></div>
+          <div class="hub-btn" id="bet-match-btn-NOR-IRQ" onclick="selectBetMatch('NOR-IRQ')">🇳🇴 vs 🇮🇶<br><small style="font-size:11px;opacity:.7">Norge – Irak</small></div>
+        </div>
       </div>
     </div>
 
@@ -392,6 +391,7 @@ let liveScores={};
 let tipForm={ hub:null, homeGoals:'', awayGoals:'', firstScorer:null, redCard:null, firstHalfGoal:null };
 let toastTimer;
 let selectedTipMatch='';
+let selectedBetMatch='';
 let devicePlayerId=null;
 let deviceIp=null;
 
@@ -889,8 +889,16 @@ function spawnConfetti(){
 
 let pendingBet = null;
 
+window.selectBetMatch=function(mk){
+  selectedBetMatch=mk;
+  Object.keys(MATCHES).forEach(k=>{
+    const btn=document.getElementById('bet-match-btn-'+k);
+    if(btn)btn.classList.toggle('selected',k===mk);
+  });
+  renderBetCatalog();
+};
 window.renderBetCatalog = function(){
-  const mk = document.getElementById('bet-match-sel').value;
+  const mk = selectedBetMatch;
   const el = document.getElementById('bet-catalog');
   if(!mk){ el.innerHTML=''; return; }
   const catalog = BET_CATALOG[mk]; if(!catalog){ el.innerHTML=''; return; }
