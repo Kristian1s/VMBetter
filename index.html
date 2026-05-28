@@ -430,8 +430,8 @@ const db = getDatabase(app);
 const RAPID_KEY = "86b71ea67bmsh076351ff0c7fb59p12fb39jsnb660034bd93f";
 
 const MATCHES = {
-  "FRA-SEN":{ label:"Irland – Qatar", home:"Irland", away:"Qatar", fixtureId:null, sofaId:15891670 },
-  "NOR-IRQ":{ label:"Norge – Irak", home:"Norge", away:"Irak", fixtureId:null, sofaId:null }
+  "FRA-SEN":{ label:"Irland – Qatar", home:"Republic of Ireland", away:"Qatar", fixtureId:null, sofaId:null, espnId:401860781, espnLeague:"fifa.friendly" },
+  "NOR-IRQ":{ label:"Norge – Irak", home:"Norge", away:"Irak", fixtureId:null, sofaId:null, espnId:null, espnLeague:null }
 };
 
 const MAX_SLURK_BUDGET = 20;
@@ -740,6 +740,55 @@ async function fetchSofaScore(sofaId){
   }catch(e){ document.getElementById('sync-label').textContent='Feil: '+e.message; return null; }
 }
 
+async function fetchESPN(league, eventId){
+  if(!league||!eventId)return null;
+  try{
+    const res=await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${league}/summary?event=${eventId}`);
+    if(!res.ok)return null;
+    const d=await res.json();
+    const comp=d.header?.competitions?.[0]; if(!comp)return null;
+    const homeC=comp.competitors.find(c=>c.homeAway==='home')||comp.competitors[0];
+    const awayC=comp.competitors.find(c=>c.homeAway==='away')||comp.competitors[1];
+    const sn=comp.status?.type?.name||'';
+    const statusMap={'STATUS_SCHEDULED':'NS','STATUS_FIRST_HALF':'1H','STATUS_HALFTIME':'HT','STATUS_SECOND_HALF':'2H','STATUS_EXTRA_TIME':'ET','STATUS_PENALTY':'P','STATUS_FINAL':'FT','STATUS_FINAL_PEN':'FT','STATUS_IN_PROGRESS':'1H'};
+    const status=statusMap[sn]||'NS';
+    const elapsed=parseInt(comp.status?.displayClock)||null;
+    const homeGoals=parseInt(homeC.score)??'-';
+    const awayGoals=parseInt(awayC.score)??'-';
+
+    const events=(d.keyEvents||[]).map(ev=>{
+      const tt=(ev.type?.type||'').toLowerCase();
+      const text=ev.text||'';
+      const min=Math.ceil((ev.clock?.value||0)/60)||parseInt(ev.clock?.displayValue)||0;
+      // Extract player and team from text: "Goal! Team X, Team Y. PlayerName (TeamName) ..."
+      const playerMatch=text.match(/\.\s+([^(]+?)\s+\(([^)]+)\)/);
+      const player=playerMatch?playerMatch[1].trim():'';
+      const team=playerMatch?playerMatch[2].trim():'';
+      if(tt.startsWith('goal')){
+        const detail=tt.includes('own')?'Own Goal':tt.includes('pen')?'Penalty':'Normal Goal';
+        return{type:'Goal',detail,team:{name:team},player:{name:player},time:{elapsed:min}};
+      }
+      if(tt.includes('yellow'))return{type:'Card',detail:'Yellow Card',team:{name:team},player:{name:player},time:{elapsed:min}};
+      if(tt.includes('red'))  return{type:'Card',detail:'Red Card',team:{name:team},player:{name:player},time:{elapsed:min}};
+      if(tt.includes('sub'))  return{type:'subst',player:{name:player},team:{name:team},time:{elapsed:min}};
+      if(tt.includes('miss')||tt.includes('penalty-miss'))return{type:'Miss',detail:'Missed Penalty',team:{name:team},player:{name:player},time:{elapsed:min}};
+      return null;
+    }).filter(Boolean);
+
+    // Halftime score: approximate from period line scores in boxscore if available
+    let halftime=null;
+    const lines=d.boxscore?.teams||[];
+    if(lines.length&&['2H','HT','FT','ET','P'].includes(status)){
+      const hLine=lines.find(t=>t.team?.id===homeC.team?.id);
+      const aLine=lines.find(t=>t.team?.id===awayC.team?.id);
+      const hP1=hLine?.statistics?.find(s=>s.name==='period1Scoring')?.displayValue;
+      const aP1=aLine?.statistics?.find(s=>s.name==='period1Scoring')?.displayValue;
+      if(hP1!==undefined)halftime={home:parseInt(hP1)??0,away:parseInt(aP1)??0};
+    }
+    return{home:homeC.team?.displayName||'',away:awayC.team?.displayName||'',homeGoals,awayGoals,status,elapsed,events,halftime};
+  }catch(e){return null;}
+}
+
 // ─── MATCH CLOCK ───
 function syncClock(mk, s){
   if(['1H','2H','ET'].includes(s.status))
@@ -803,8 +852,9 @@ async function refreshLive(){
   for(const[key,match]of Object.entries(MATCHES)){
     if(liveScores[key]?.status==='FT')continue;
     let s=null;
-    if(match.sofaId)s=await fetchSofaScore(match.sofaId);
-    else if(match.fixtureId)s=await fetchLive(match.fixtureId);
+    if(match.espnId)s=await fetchESPN(match.espnLeague,match.espnId);
+    if(!s&&match.sofaId)s=await fetchSofaScore(match.sofaId);
+    if(!s&&match.fixtureId)s=await fetchLive(match.fixtureId);
     if(s){
       const newEvs=checkNewEvents(key,s.events||[]);
       liveScores[key]=s; syncClock(key,s);
