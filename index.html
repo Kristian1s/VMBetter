@@ -64,7 +64,7 @@ select option{background:var(--bg3)}
 .cat-header{font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);padding:6px 0;margin-bottom:6px;display:flex;align-items:center;gap:8px}
 .bet-item{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;margin-bottom:6px;cursor:pointer;transition:border-color .15s,background .15s;gap:10px}
 .bet-item:hover{border-color:var(--green);background:var(--bg3)}
-.bet-item.already-placed{opacity:.45;pointer-events:none}
+.bet-item.already-placed{border-color:var(--green)}
 .bet-item-text{flex:1;font-size:14px;line-height:1.4}
 .bet-item-odds{display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex-shrink:0}
 .odds-badge{background:var(--amber-light);color:var(--amber);padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;white-space:nowrap}
@@ -140,7 +140,7 @@ select option{background:var(--bg3)}
 #tab-tv{display:none}
 #tab-tv.active{display:grid;grid-template-columns:280px 1fr 1fr 280px;grid-template-rows:auto auto;gap:16px;max-width:none;margin:0 auto;padding:1.5rem}
 @media(min-width:900px){#tab-tv.active{display:grid}}
-.tv-bets-col{overflow-y:auto;max-height:600px}
+.tv-bets-col{overflow-y:auto;height:calc(100vh - 120px)}
 .tv-bet-player{margin-bottom:14px}
 .tv-bet-player-name{font-size:13px;font-weight:600;color:var(--text2);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;display:flex;align-items:center;gap:8px}
 .tv-bet-row{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:8px 10px;margin-bottom:6px}
@@ -1509,22 +1509,26 @@ window.renderBetCatalog = function(){
     return;
   }
   const catalog = BET_CATALOG[mk]; if(!catalog){ el.innerHTML='<div class="empty">Ingen bets tilgjengelig</div>'; return; }
-  const openBetsByBetId={};
-  Object.values(bets).filter(b=>b.matchKey===mk&&b.status==='open').forEach(b=>{ openBetsByBetId[b.betId]=b; });
+  // Group open bets by betId to show all placers (multiple allowed)
+  const placersByBetId={};
+  Object.values(bets).filter(b=>b.matchKey===mk&&b.status==='open').forEach(b=>{
+    if(!placersByBetId[b.betId])placersByBetId[b.betId]=[];
+    placersByBetId[b.betId].push(b.placerName);
+  });
   const wonIds=new Set(Object.values(bets).filter(b=>b.matchKey===mk&&b.status==='won').map(b=>b.betId));
   const lostIds=new Set(Object.values(bets).filter(b=>b.matchKey===mk&&b.status==='lost').map(b=>b.betId));
 
   el.innerHTML = catalog.categories.map(cat=>{
     const items=cat.bets.map(b=>{
-      if(wonIds.has(b.id)||lostIds.has(b.id))return''; // completely hide resolved bets
-      const placed=openBetsByBetId[b.id];
+      if(wonIds.has(b.id)||lostIds.has(b.id))return'';
+      const placers=placersByBetId[b.id]||[];
       const live=calcLiveOdds(b,mk);
       const oddsDisplay=live.odds;
       const oddsTag=live.changed
         ?`<span class="odds-badge" style="background:${live.dir==='down'?'var(--green-light)':'var(--red-light)'}; color:${live.dir==='down'?'var(--green)':'var(--red)'}">${oddsDisplay}× ${live.dir==='down'?'↓':'↑'}</span>`
         :`<span class="odds-badge">${oddsDisplay}×</span>`;
-      const tag=placed?`<span style="color:var(--green);font-size:12px">✓ ${placed.placerName}</span>`:'';
-      return`<div class="bet-item${placed?' already-placed':''}" onclick="${placed?'':` selectBet('${mk}','${b.id}')`}">
+      const tag=placers.length?`<span style="color:var(--green);font-size:12px">✓ ${placers.join(', ')}</span>`:'';
+      return`<div class="bet-item${placers.length?' already-placed':''}" onclick="selectBet('${mk}','${b.id}')">
         <div class="bet-item-text">${b.text} ${tag}</div>
         <div class="bet-item-odds">${oddsTag}</div>
       </div>`;
@@ -1912,8 +1916,15 @@ function renderTVBets(){
     }).join('');
   }
 
+  const prevLeft=leftEl.innerHTML, prevRight=rightEl.innerHTML;
   leftEl.innerHTML=renderCol(leftIds);
   rightEl.innerHTML=renderCol(rightIds);
+  // Auto-scroll to bottom when new bets added
+  ['tv-bets-left','tv-bets-right'].forEach(id=>{
+    const col=document.getElementById(id); if(!col)return;
+    const changed=(id==='tv-bets-left'?prevLeft:prevRight)!==(id==='tv-bets-left'?leftEl.innerHTML:rightEl.innerHTML);
+    if(changed) col.scrollTo({top:col.scrollHeight,behavior:'smooth'});
+  });
 }
 
 // ─── TEST SCORE PANEL ───
