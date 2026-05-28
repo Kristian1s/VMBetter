@@ -423,7 +423,7 @@ const db = getDatabase(app);
 const RAPID_KEY = "86b71ea67bmsh076351ff0c7fb59p12fb39jsnb660034bd93f";
 
 const MATCHES = {
-  "FRA-SEN":{ label:"Frankrike – Senegal", home:"Frankrike", away:"Senegal", fixtureId:null, sofaId:null },
+  "FRA-SEN":{ label:"Frankrike – Senegal", home:"Frankrike", away:"Senegal", fixtureId:null, sofaId:15891670 },
   "NOR-IRQ":{ label:"Norge – Irak", home:"Norge", away:"Irak", fixtureId:null, sofaId:null }
 };
 
@@ -716,7 +716,7 @@ async function refreshLive(){
   renderLiveBox();
   if(currentTab==='tv')renderTVLive();
 }
-refreshLive(); setInterval(refreshLive,120000);
+refreshLive(); setInterval(refreshLive,20000);
 
 // Calculate live/final points for all tips of a match based on current score
 function calcLivePoints(mk, score){
