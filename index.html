@@ -248,6 +248,43 @@ select option{background:var(--bg3)}
     </div>
     <div id="player-list"></div>
     <div id="reset-wrap"></div>
+    <div id="test-panel" style="display:none;margin-top:16px">
+      <div class="card" style="border-color:var(--amber)">
+        <div class="card-label">🧪 Test Score</div>
+        <div class="row2" style="margin-bottom:10px">
+          <div class="field">
+            <label>Kamp</label>
+            <select id="test-match" onchange="updateTestLabels()">
+              <option value="FRA-SEN">FRA – SEN</option>
+              <option value="NOR-IRQ">NOR – IRQ</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Status</label>
+            <select id="test-status">
+              <option value="1H">1H — Live</option>
+              <option value="HT">HT — Pause</option>
+              <option value="2H">2H — Live</option>
+              <option value="FT">FT — Ferdig</option>
+            </select>
+          </div>
+        </div>
+        <div class="row2" style="margin-bottom:10px">
+          <div class="field"><label id="test-home-lbl">Hjemme</label><input type="number" id="test-hg" min="0" value="0"></div>
+          <div class="field"><label id="test-away-lbl">Borte</label><input type="number" id="test-ag" min="0" value="0"></div>
+        </div>
+        <div class="field" style="margin-bottom:10px"><label>Minutter spilt</label><input type="number" id="test-elapsed" min="0" max="90" value="45"></div>
+        <div style="margin-bottom:8px">
+          <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:6px">HURTIG-EVENTS</div>
+          <div id="test-event-btns" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+        </div>
+        <div id="test-events-display" style="font-size:12px;color:var(--amber);min-height:18px;margin-bottom:10px"></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary" style="flex:1" onclick="applyTestScore()">▶ Apply</button>
+          <button class="btn" onclick="clearTestScore()">Reset</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- ===== TIPPING ===== -->
@@ -504,6 +541,8 @@ function renderPlayers(){
       ${isAdmin()?`<button class="btn btn-sm" style="color:var(--red)" onclick="removePlayer('${id}')">×</button>`:''}
     </div>`).join('')+'</div>';
   document.getElementById('reset-wrap').innerHTML=isAdmin()?`<button class="btn btn-sm btn-full" style="color:var(--red);border-color:var(--red-dark);margin-top:4px" onclick="resetAll()">🗑️ Nullstill alt</button>`:'';
+  const tp=document.getElementById('test-panel');
+  if(tp){ tp.style.display=isAdmin()?'block':'none'; if(isAdmin())updateTestLabels(); }
 }
 
 function renderPlayerSelects(){
@@ -1270,6 +1309,74 @@ function renderTVBets(){
       <div style="font-size:12px;color:var(--text2)">${b.placerName} · 🍺${b.stake} → 🎉${b.payout}</div>
     </div>`).join('')+'</div>';
 }
+
+// ─── TEST SCORE PANEL ───
+const TEST_EVENTS_BY_MATCH = {
+  'FRA-SEN': [
+    { label:'⚽ Mbappe (FRA)',  ev:{ type:'Goal', detail:'Normal Goal', team:{name:'France'},  player:{name:'Mbappe'} } },
+    { label:'⚽ Dembele (FRA)', ev:{ type:'Goal', detail:'Normal Goal', team:{name:'France'},  player:{name:'Dembele'} } },
+    { label:'⚽ Sarr (SEN)',    ev:{ type:'Goal', detail:'Normal Goal', team:{name:'Senegal'}, player:{name:'Sarr'} } },
+    { label:'⚽ Diatta (SEN)',  ev:{ type:'Goal', detail:'Normal Goal', team:{name:'Senegal'}, player:{name:'Diatta'} } },
+    { label:'🟥 Rødt kort',    ev:{ type:'Card', detail:'Red Card',    team:{name:''},         player:{name:''} } },
+    { label:'🟨 Straffe',      ev:{ type:'Goal', detail:'Penalty',     team:{name:'France'},   player:{name:'Mbappe'} } },
+  ],
+  'NOR-IRQ': [
+    { label:'⚽ Haaland (NOR)', ev:{ type:'Goal', detail:'Normal Goal', team:{name:'Norway'}, player:{name:'Haaland'} } },
+    { label:'⚽ Sørloth (NOR)', ev:{ type:'Goal', detail:'Normal Goal', team:{name:'Norway'}, player:{name:'Sorloth'} } },
+    { label:'⚽ Nusa (NOR)',    ev:{ type:'Goal', detail:'Normal Goal', team:{name:'Norway'}, player:{name:'Nusa'} } },
+    { label:'⚽ Irak scorer',   ev:{ type:'Goal', detail:'Normal Goal', team:{name:'Iraq'},   player:{name:'Al-Hamdani'} } },
+    { label:'🟥 Rødt kort',    ev:{ type:'Card', detail:'Red Card',    team:{name:''},        player:{name:''} } },
+    { label:'🟨 Straffe Haal', ev:{ type:'Goal', detail:'Penalty',     team:{name:'Norway'}, player:{name:'Haaland'} } },
+  ]
+};
+let testEvents=[];
+
+window.updateTestLabels=function(){
+  const mk=document.getElementById('test-match').value;
+  const m=MATCHES[mk]; if(!m)return;
+  document.getElementById('test-home-lbl').textContent=m.home;
+  document.getElementById('test-away-lbl').textContent=m.away;
+  const btns=document.getElementById('test-event-btns'); if(!btns)return;
+  btns.innerHTML=(TEST_EVENTS_BY_MATCH[mk]||[]).map((e,i)=>
+    `<button class="btn btn-sm" onclick="addTestEvent(${i})">${e.label}</button>`
+  ).join('')+`<button class="btn btn-sm btn-red" onclick="clearTestEvents()">✕ Reset events</button>`;
+};
+window.addTestEvent=function(i){
+  const mk=document.getElementById('test-match').value;
+  const elapsed=parseInt(document.getElementById('test-elapsed').value)||45;
+  const def=TEST_EVENTS_BY_MATCH[mk]?.[i]; if(!def)return;
+  testEvents.push({...def.ev, time:{elapsed}});
+  renderTestEvents();
+};
+window.clearTestEvents=function(){ testEvents=[]; renderTestEvents(); };
+function renderTestEvents(){
+  const el=document.getElementById('test-events-display'); if(!el)return;
+  el.textContent=testEvents.length?testEvents.map(e=>`${e.type==='Goal'?'⚽':'🟥'} ${e.player?.name||e.detail}`).join(' · '):'';
+}
+window.applyTestScore=function(){
+  const mk=document.getElementById('test-match').value;
+  const status=document.getElementById('test-status').value;
+  const hg=parseInt(document.getElementById('test-hg').value)||0;
+  const ag=parseInt(document.getElementById('test-ag').value)||0;
+  const elapsed=parseInt(document.getElementById('test-elapsed').value)||0;
+  const match=MATCHES[mk]; if(!match)return;
+  const hasHalf=['HT','2H','FT'].includes(status);
+  liveScores[mk]={ home:match.home, away:match.away, homeGoals:hg, awayGoals:ag,
+    status, elapsed:status==='FT'?null:elapsed, events:[...testEvents],
+    halftime:hasHalf?{home:hg,away:ag}:null };
+  calcLivePoints(mk,liveScores[mk]);
+  autoResolveBets(mk,liveScores[mk]);
+  renderLiveBox(); renderScore();
+  if(currentTab==='tv')renderTV();
+  showToast(`Test: ${match.home} ${hg}–${ag} ${match.away} (${status})`);
+};
+window.clearTestScore=function(){
+  const mk=document.getElementById('test-match').value;
+  delete liveScores[mk]; testEvents=[];
+  renderTestEvents(); renderLiveBox(); renderScore();
+  if(currentTab==='tv')renderTV();
+  showToast('Test score nullstilt');
+};
 
 // ─── DEVICE IP AUTO-SELECT ───
 async function detectDevicePlayer(){
