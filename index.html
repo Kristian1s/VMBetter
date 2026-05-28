@@ -742,27 +742,36 @@ function checkNewEvents(mk, events){
   });
 }
 function showEventBanner(ev, mk){
-  const isGoal=ev.type==='Goal'&&ev.detail!=='Missed Penalty';
-  const isRed=ev.type==='Card'&&ev.detail==='Red Card';
-  if(!isGoal&&!isRed)return;
   const banner=document.getElementById('tv-event-banner'); if(!banner)return;
-  const icon=isGoal?'⚽':'🟥';
-  const title=isGoal?(ev.detail==='Own Goal'?'SELVMÅL!':'MÅL!'):'RØDT KORT!';
-  const color=isGoal?'var(--green)':'var(--red)';
-  const match=MATCHES[mk];
-  banner.style.background=`linear-gradient(135deg,var(--bg2),var(--bg3))`;
-  banner.style.borderBottom=`4px solid ${color}`;
+  let icon,title,color,big=true,duration=7000;
+
+  if(ev.type==='Goal'){
+    if(ev.detail==='Own Goal'){       icon='🔄';title='SELVMÅL!';     color='var(--amber)'; }
+    else if(ev.detail==='Penalty'){   icon='⚽';title='STRAFFE SCORET!';color='var(--green)'; }
+    else{                              icon='⚽';title='MÅL!';           color='var(--green)'; }
+  } else if(ev.type==='Card'){
+    if(ev.detail==='Red Card'){        icon='🟥';title='RØDT KORT!';    color='var(--red)'; }
+    else{                              icon='🟨';title='GULT KORT';      color='var(--amber)';big=false;duration=4000; }
+  } else if(ev.type==='Miss'){
+    icon='❌';title='STRAFFE BRENT!'; color='var(--red)';
+  } else if(ev.type==='subst'){
+    icon='🔄';title='BYTTE';          color='var(--blue)';big=false;duration=4000;
+  } else { return; }
+
+  const elapsed=ev.time?.elapsed?`${ev.time.elapsed}'`:'';
+  const player=ev.player?.name||'';
+  const team=ev.team?.name||'';
+  banner.style.cssText=`background:linear-gradient(135deg,var(--bg2),var(--bg3));border-bottom:4px solid ${color};display:flex;align-items:center;justify-content:center;gap:20px;padding:${big?'1.25rem 2rem':'.75rem 2rem'};animation:slideDown .35s ease`;
   banner.innerHTML=`
-    <span style="font-size:56px;line-height:1">${icon}</span>
+    <span style="font-size:${big?'56':'32'}px;line-height:1">${icon}</span>
     <div style="text-align:center">
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:52px;letter-spacing:3px;color:${color};line-height:1">${title}</div>
-      <div style="font-size:20px;font-weight:600;margin-top:4px">${ev.player?.name||''} <span style="color:var(--text2);font-size:16px">${ev.time?.elapsed?ev.time.elapsed+"'":''}</span></div>
-      <div style="font-size:15px;color:var(--text2)">${ev.team?.name||''}</div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:${big?'52':'28'}px;letter-spacing:3px;color:${color};line-height:1">${title}</div>
+      <div style="font-size:${big?'20':'15'}px;font-weight:600;margin-top:2px">${player} <span style="color:var(--text2);font-size:${big?'16':'13'}px">${elapsed}</span></div>
+      ${team?`<div style="font-size:${big?'15':'13'}px;color:var(--text2)">${team}</div>`:''}
     </div>
-    <span style="font-size:56px;line-height:1">${icon}</span>`;
-  banner.style.display='flex';
+    <span style="font-size:${big?'56':'32'}px;line-height:1">${icon}</span>`;
   clearTimeout(bannerTimer);
-  bannerTimer=setTimeout(()=>{ banner.style.display='none'; },7000);
+  bannerTimer=setTimeout(()=>{ banner.style.display='none'; },duration);
 }
 
 async function refreshLive(){
@@ -1523,7 +1532,7 @@ function renderTVLive(){
     const isLive=['1H','HT','2H','ET','P'].includes(s.status);
     const isFT=s.status==='FT';
     const clock=getClockDisplay(mk);
-    const importantEvs=(s.events||[]).filter(e=>e.type==='Goal'||(e.type==='Card'&&e.detail==='Red Card'));
+    const importantEvs=(s.events||[]).filter(e=>e.type==='Goal'||e.type==='Card'||e.type==='Miss'||e.type==='subst');
     return`<div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
         <span style="font-size:13px;color:var(--text2)">${m?.label||mk}</span>
@@ -1531,13 +1540,15 @@ function renderTVLive(){
       </div>
       <div class="tv-live-score">${s.homeGoals} – ${s.awayGoals}</div>
       <div style="text-align:center;font-family:'Bebas Neue',sans-serif;font-size:32px;color:${isLive?'var(--green)':isFT?'var(--text2)':'var(--text3)'};letter-spacing:1px;margin:4px 0">${clock}</div>
-      ${importantEvs.length?`<div class="tv-event-feed">${importantEvs.map(e=>`
-        <div style="display:flex;align-items:center;gap:8px;font-size:14px">
-          <span>${e.type==='Goal'?'⚽':'🟥'}</span>
-          <span style="color:var(--text2);font-size:12px;min-width:28px">${e.time?.elapsed||''}'</span>
-          <span style="font-weight:500">${e.player?.name||''}</span>
-          <span style="color:var(--text3);font-size:12px">${e.team?.name||''}</span>
-        </div>`).join('')}</div>`:''}
+      ${importantEvs.length?`<div class="tv-event-feed">${importantEvs.map(e=>{
+        const icon=e.type==='Goal'?(e.detail==='Own Goal'?'🔄':e.detail==='Penalty'?'⚽🅿️':'⚽'):e.type==='Miss'?'❌':e.type==='subst'?'🔄':e.detail==='Red Card'?'🟥':'🟨';
+        const label=e.type==='subst'?`${e.player?.name||''} ↔ ${e.assist?.name||''}`:e.player?.name||'';
+        return`<div style="display:flex;align-items:center;gap:8px;font-size:13px;opacity:${e.type==='subst'?'0.65':'1'}">
+          <span>${icon}</span>
+          <span style="color:var(--text2);font-size:11px;min-width:24px">${e.time?.elapsed||''}'</span>
+          <span style="font-weight:500">${label}</span>
+          <span style="color:var(--text3);font-size:11px">${e.team?.name||''}</span>
+        </div>`;}).join('')}</div>`:''}
     </div>`;
   }).join('');
 }
