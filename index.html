@@ -138,8 +138,14 @@ select option{background:var(--bg3)}
 
 /* ═══════════════════ TV VIEW ═══════════════════ */
 #tab-tv{display:none}
-#tab-tv.active{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto;gap:16px;max-width:1400px;margin:0 auto;padding:1.5rem}
+#tab-tv.active{display:grid;grid-template-columns:280px 1fr 1fr 280px;grid-template-rows:auto auto;gap:16px;max-width:none;margin:0 auto;padding:1.5rem}
 @media(min-width:900px){#tab-tv.active{display:grid}}
+.tv-bets-col{overflow-y:auto;max-height:600px}
+.tv-bet-player{margin-bottom:14px}
+.tv-bet-player-name{font-size:13px;font-weight:600;color:var(--text2);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.tv-bet-row{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:8px 10px;margin-bottom:6px}
+.tv-bet-row.won{border-color:var(--green);background:var(--green-light)}
+.tv-bet-row.lost{opacity:.4}
 
 .tv-card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:1.25rem;overflow:hidden}
 .tv-title{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px;color:var(--text2);margin-bottom:1rem}
@@ -359,32 +365,36 @@ select option{background:var(--bg3)}
   <div id="tv-event-banner"></div>
   <div class="section" id="tab-tv">
 
-    <!-- PODIUMS side by side -->
-    <div class="podium-wrap tv-card" id="tv-podium" style="grid-column:auto">
+    <!-- LEFT bets column (spans both rows) -->
+    <div class="tv-card tv-bets-col" id="tv-bets-left" style="grid-column:1;grid-row:1/3">
+      <div class="tv-title">VEDDEMÅL 🍺</div>
+      <div id="tv-bets-left-content"></div>
+    </div>
+
+    <!-- PODIUMS (columns 2 & 3, row 1) -->
+    <div class="podium-wrap tv-card" id="tv-podium" style="grid-column:2;grid-row:1">
       <div class="podium-headline" style="font-size:28px">VM <span>TIPPEKONK</span> 🎯</div>
       <div class="podium-stage" id="podium-stage"></div>
     </div>
-
-    <div class="podium-wrap tv-card" id="tv-slurkebet-podium" style="grid-column:auto">
+    <div class="podium-wrap tv-card" id="tv-slurkebet-podium" style="grid-column:3;grid-row:1">
       <div class="podium-headline" style="font-size:28px">SLURKEBET<span style="font-size:.5em;vertical-align:super">™</span> 🍺</div>
       <div class="podium-stage" id="slurkebet-podium-stage"></div>
     </div>
 
-    <!-- SCORE + LIVE side by side -->
-    <div class="tv-card" id="tv-score-card">
+    <!-- RIGHT bets column (spans both rows) -->
+    <div class="tv-card tv-bets-col" id="tv-bets-right" style="grid-column:4;grid-row:1/3">
+      <div class="tv-title">VEDDEMÅL 🍺</div>
+      <div id="tv-bets-right-content"></div>
+    </div>
+
+    <!-- SCORE + LIVE (columns 2 & 3, row 2) -->
+    <div class="tv-card" id="tv-score-card" style="grid-column:2;grid-row:2">
       <div class="tv-title">POENGTAVLE</div>
       <div id="tv-scoreboard"></div>
     </div>
-
-    <div class="tv-card" id="tv-live-card">
+    <div class="tv-card" id="tv-live-card" style="grid-column:3;grid-row:2">
       <div class="tv-title">LIVE SCORE</div>
       <div id="tv-live"></div>
-    </div>
-
-    <!-- BETS full width -->
-    <div class="tv-card" style="grid-column:1/3" id="tv-bets-card">
-      <div class="tv-title">AKTIVE VEDDEMÅL 🍺</div>
-      <div id="tv-bets"></div>
     </div>
 
   </div>
@@ -1048,9 +1058,9 @@ window.renderTipForm=function(){
     <div class="card"><div class="card-label">Stilling — maks 6 poeng</div>
       <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Rett målforskjell +3p · Eksakt stilling +3p ekstra</div>
       <div class="score-inp-row">
-        <input type="number" id="tip-hg" min="0" max="20" placeholder="0">
+        <input type="number" id="tip-hg" min="0" max="20" value="0">
         <span style="font-size:22px;font-weight:700;color:var(--text2)">–</span>
-        <input type="number" id="tip-ag" min="0" max="20" placeholder="0">
+        <input type="number" id="tip-ag" min="0" max="20" value="0">
       </div>
       <div style="text-align:center;font-size:12px;color:var(--text2)">${match.home} – ${match.away}</div></div>
     <div class="card"><div class="card-label">Bonusspørsmål — 2 poeng hver</div>
@@ -1814,13 +1824,14 @@ function renderTVLive(){
   const el=document.getElementById('tv-live'); if(!el)return;
   const entries=Object.entries(liveScores);
   if(!entries.length){ el.innerHTML='<div style="color:var(--text3);font-size:14px">Ingen live kamper</div>'; return; }
-  el.innerHTML=entries.map(([mk,s])=>{
+  el.innerHTML=entries.map(([mk,s],i)=>{
     const m=MATCHES[mk];
     const isLive=['1H','HT','2H','ET','P'].includes(s.status);
     const isFT=s.status==='FT';
     const clock=getClockDisplay(mk);
+    const sep=i>0?'border-top:1px solid var(--border);margin-top:16px;padding-top:16px':'';
     const importantEvs=(s.events||[]).filter(e=>e.type==='Goal'||e.type==='Card'||e.type==='Miss'||e.type==='subst');
-    return`<div>
+    return`<div style="${sep}">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
         <span style="font-size:13px;color:var(--text2)">${m?.label||mk}</span>
         <span>${isLive?'<span class="live-badge">LIVE</span>':isFT?'<span style="color:var(--green);font-size:12px;font-weight:600">✅ FT</span>':''}</span>
@@ -1862,18 +1873,47 @@ function renderTVSlurkebet(){
 }
 
 function renderTVBets(){
-  const el=document.getElementById('tv-bets'); if(!el)return;
-  const open=Object.entries(bets).filter(([,b])=>b.status==='open');
-  if(!open.length){ el.innerHTML='<div style="color:var(--text3)">Ingen aktive veddemål</div>'; return; }
-  el.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">`+
-    open.map(([,b])=>`<div style="background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:.75rem">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <span style="font-size:12px;color:var(--text2)">${b.matchLabel||''}</span>
-        <span class="sip-badge">${b.odds}×</span>
-      </div>
-      <div style="font-size:14px;font-weight:500;margin-bottom:4px">${b.desc}</div>
-      <div style="font-size:12px;color:var(--text2)">${b.placerName} · 🍺${b.stake} → 🎉${b.payout}</div>
-    </div>`).join('')+'</div>';
+  const leftEl=document.getElementById('tv-bets-left-content');
+  const rightEl=document.getElementById('tv-bets-right-content');
+  if(!leftEl||!rightEl)return;
+
+  // Group all bets (open + won) by player, sorted by player order in leaderboard
+  const playerOrder=getSorted().map(([id])=>id);
+  const byPlayer={};
+  Object.entries(bets).forEach(([,b])=>{
+    if(b.status==='lost')return;
+    if(!byPlayer[b.placerId])byPlayer[b.placerId]={name:b.placerName,bets:[]};
+    byPlayer[b.placerId].bets.push(b);
+  });
+  const sorted=playerOrder.filter(id=>byPlayer[id]);
+  const half=Math.ceil(sorted.length/2);
+  const leftIds=sorted.slice(0,half);
+  const rightIds=sorted.slice(half);
+
+  function renderCol(ids){
+    if(!ids.length)return`<div style="color:var(--text3);font-size:13px">Ingen bets ennå</div>`;
+    return ids.map(pid=>{
+      const grp=byPlayer[pid]; if(!grp)return'';
+      const p=players[pid];
+      return`<div class="tv-bet-player">
+        <div class="tv-bet-player-name">${avatarEl(p,pid)} ${grp.name}</div>
+        ${grp.bets.map(b=>{
+          const won=b.status==='won';
+          return`<div class="tv-bet-row${won?' won':''}">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+              <span style="font-size:11px;color:var(--text2)">${b.matchLabel||''}</span>
+              <span style="font-size:13px;font-weight:700;color:${won?'var(--green)':'var(--amber)'}">${b.odds}×${won?' 🎉':''}</span>
+            </div>
+            <div style="font-size:13px;font-weight:500;margin-bottom:2px">${b.desc}</div>
+            <div style="font-size:11px;color:var(--text2)">🍺${b.stake} inn → 🎉${b.payout} ut${won?` <strong style="color:var(--green)">TREFF!</strong>`:''}</div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    }).join('');
+  }
+
+  leftEl.innerHTML=renderCol(leftIds);
+  rightEl.innerHTML=renderCol(rightIds);
 }
 
 // ─── TEST SCORE PANEL ───
