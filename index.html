@@ -472,8 +472,9 @@ window.showTab=function(id){
   const mw=document.getElementById('main-wrap');
   if(id==='tv'){ mw.style.maxWidth='none'; mw.style.padding='0'; }
   else{ mw.style.maxWidth=''; mw.style.padding=''; }
-  if(id==='tipping'){ renderPlayerSelects(); renderLiveBox(); }
-  if(id==='betting'){ renderBets(); renderBetCatalog(); }
+  if(id==='spillere')renderPlayers();
+  if(id==='tipping'){ renderPlayerSelects(); renderLiveBox(); renderMatchButtons(); }
+  if(id==='betting'){ renderBets(); renderBetCatalog(); renderMatchButtons(); }
   if(id==='poeng')renderScore();
   if(id==='tv')renderTV();
 };
@@ -548,6 +549,41 @@ function renderPlayers(){
 function renderAdminPlayers(){
   document.getElementById('spillere-title').textContent='Spillere';
   document.getElementById('add-player-card').style.display='block';
+
+  // ── Match management at top ──
+  const matchEntries=Object.entries(MATCHES);
+  const matchRows=matchEntries.map(([mk,m])=>`
+    <div class="player-row">
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:500">${teamFlag(m.home)}${getTeamAbbr(m.home)} vs ${teamFlag(m.away)}${getTeamAbbr(m.away)}</div>
+        <div style="font-size:11px;color:var(--text3)">${m.espnLeague||'–'} · ESPN ID: ${m.espnId||'–'}</div>
+      </div>
+      <button class="btn btn-sm btn-red" onclick="removeMatch('${mk}')">×</button>
+    </div>`).join('');
+  const matchCard=`<div class="card" style="margin-bottom:12px;border-color:var(--blue)">
+    <div class="card-label">⚽ Kamper</div>
+    ${matchEntries.length ? matchRows : '<div style="font-size:13px;color:var(--amber);margin-bottom:10px">⚠️ Ingen kamper lagt til ennå</div>'}
+    <div style="border-top:1px solid var(--border);margin-top:10px;padding-top:10px">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:6px">Legg til kamp via ESPN ID:</div>
+      <select id="add-match-league" style="margin-bottom:8px;font-size:13px;width:100%">
+        <option value="fifa.world">VM 2026 (fifa.world)</option>
+        <option value="fifa.friendly">Vennekamp (fifa.friendly)</option>
+        <option value="uefa.euro_q">EM-kval</option>
+        <option value="concacaf.world-q">CONCACAF kval</option>
+        <option value="eng.1">Premier League</option>
+        <option value="esp.1">La Liga</option>
+        <option value="ger.1">Bundesliga</option>
+      </select>
+      <div style="display:flex;gap:8px">
+        <input type="number" id="add-match-id" placeholder="ESPN event ID" style="flex:1">
+        <button class="btn btn-primary" onclick="fetchAndAddMatch()">+ Legg til</button>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:5px">Finn ID på espn.com — siste tall i kampens URL</div>
+    </div>
+  </div>`;
+  // Insert match card before player list
+  document.getElementById('add-player-card').insertAdjacentHTML('afterend', matchCard);
+
   const el=document.getElementById('player-list');
   const list=Object.entries(players);
   if(!list.length){ el.innerHTML='<div class="empty">Ingen spillere enda</div>'; }
@@ -562,37 +598,6 @@ function renderAdminPlayers(){
   document.getElementById('reset-wrap').innerHTML=`<button class="btn btn-sm btn-full" style="color:var(--red);border-color:var(--red-dark);margin-top:4px" onclick="resetAll()">🗑️ Nullstill alt</button>`;
   const tp=document.getElementById('test-panel');
   if(tp){ tp.style.display='block'; updateTestLabels(); }
-  // Match management
-  const matchEntries=Object.entries(MATCHES);
-  const matchHtml=matchEntries.map(([mk,m])=>`
-    <div class="player-row">
-      <div style="flex:1">
-        <div style="font-size:14px;font-weight:500">${teamFlag(m.home)}${getTeamAbbr(m.home)} vs ${teamFlag(m.away)}${getTeamAbbr(m.away)}</div>
-        <div style="font-size:11px;color:var(--text3)">${m.espnLeague||'–'} · ESPN: ${m.espnId||'–'}</div>
-      </div>
-      <button class="btn btn-sm btn-red" onclick="removeMatch('${mk}')">×</button>
-    </div>`).join('');
-  const matchMgmt=`<div class="card" style="margin-top:12px;border-color:var(--blue)">
-    <div class="card-label">⚽ Kamper</div>
-    ${matchEntries.length?matchHtml:'<div style="font-size:13px;color:var(--text3);margin-bottom:10px">Ingen kamper ennå</div>'}
-    <div style="border-top:1px solid var(--border);margin-top:10px;padding-top:10px">
-      <select id="add-match-league" style="margin-bottom:8px;font-size:13px">
-        <option value="fifa.world">VM 2026 (fifa.world)</option>
-        <option value="fifa.friendly">Vennekamp (fifa.friendly)</option>
-        <option value="uefa.euro_q">EM-kval (UEFA)</option>
-        <option value="concacaf.world-q">CONCACAF kval</option>
-        <option value="eng.1">Premier League</option>
-        <option value="esp.1">La Liga</option>
-        <option value="ger.1">Bundesliga</option>
-      </select>
-      <div style="display:flex;gap:8px">
-        <input type="number" id="add-match-id" placeholder="ESPN event ID" style="flex:1;font-size:14px">
-        <button class="btn btn-primary" onclick="fetchAndAddMatch()">+ Hent</button>
-      </div>
-      <div style="font-size:11px;color:var(--text3);margin-top:6px">Finn ID på espn.com – siste tall i URL</div>
-    </div>
-  </div>`;
-  document.getElementById('reset-wrap').innerHTML += matchMgmt;
 }
 
 function renderMyOverview(){
@@ -1167,6 +1172,11 @@ function renderMatchButtons(){
   const cols=Math.max(1,Math.min(list.length,3));
   ['tip-match-buttons','bet-match-buttons'].forEach(cid=>{
     const el=document.getElementById(cid); if(!el)return;
+    if(!list.length){
+      el.style.gridTemplateColumns='1fr';
+      el.innerHTML=`<div style="font-size:13px;color:var(--text3);padding:10px;text-align:center">Ingen kamper konfigurert — admin legger til kamper i <strong>Spillere</strong>-fanen</div>`;
+      return;
+    }
     const isBet=cid.startsWith('bet');
     el.style.gridTemplateColumns=`repeat(${cols},1fr)`;
     el.innerHTML=list.map(([mk,m])=>`<div class="hub-btn" id="${isBet?'bet-match-btn':'match-btn'}-${mk}" onclick="${isBet?'selectBetMatch':'selectTipMatch'}('${mk}')">${teamFlag(m.home)}${getTeamAbbr(m.home)} vs ${teamFlag(m.away)}${getTeamAbbr(m.away)}</div>`).join('');
