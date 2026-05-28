@@ -299,7 +299,7 @@ select option{background:var(--bg3)}
         </div>
       </div>
       <div class="field" id="tip-player-field"><label id="tip-player-label">Hvem tipper?</label>
-        <select id="tip-player-select"><option value="">Velg spiller...</option></select>
+        <select id="tip-player-select" onchange="renderTipForm()"><option value="">Velg spiller...</option></select>
       </div>
     </div>
     <div id="tip-form"></div>
@@ -760,6 +760,26 @@ function renderLiveBox(){
 }
 
 // ─── TIPPING ───
+function showLockedTip(mk,t,el){
+  const match=MATCHES[mk];
+  const hubLabel=t.hub==='H'?match?.home:t.hub==='B'?match?.away:'Uavgjort';
+  const scorerLabel=t.firstScorer==='H'?match?.home:t.firstScorer==='A'?match?.away:'Ingen mål';
+  el.innerHTML=`<div class="card" style="border-color:var(--green)">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <span style="font-size:20px">🔒</span>
+      <div><div style="font-weight:600;font-size:15px">Tipp låst</div><div style="font-size:12px;color:var(--text2)">Du kan bare tippe én gang per kamp</div></div>
+    </div>
+    <div style="background:var(--bg3);border-radius:10px;padding:10px 14px">
+      <div style="font-size:18px;font-weight:600;margin-bottom:6px">${match?.home} ${t.homeGoals}–${t.awayGoals} ${match?.away} <span style="font-size:14px;color:var(--text2)">(${t.hub})</span></div>
+      <div style="font-size:13px;color:var(--text2);display:flex;flex-direction:column;gap:3px">
+        <span>⚽ Første scorer: <strong style="color:var(--text)">${scorerLabel}</strong></span>
+        <span>🟥 Rødt kort: <strong style="color:var(--text)">${t.redCard==='Y'?'Ja':'Nei'}</strong></span>
+        <span>⏱️ Mål 1. omgang: <strong style="color:var(--text)">${t.firstHalfGoal==='Y'?'Ja':'Nei'}</strong></span>
+      </div>
+    </div>
+    <div style="font-size:12px;color:var(--text3);margin-top:8px;text-align:center">Be admin om å slette tipset hvis noe er galt</div>
+  </div>`;
+}
 window.selectTipMatch=function(mk){
   selectedTipMatch=mk;
   Object.keys(MATCHES).forEach(k=>{
@@ -772,6 +792,11 @@ window.renderTipForm=function(){
   const mk=selectedTipMatch;
   renderLiveBox();
   const el=document.getElementById('tip-form'); if(!mk){ el.innerHTML=''; return; }
+  const pid=document.getElementById('tip-player-select').value;
+  if(pid){
+    const existing=Object.values(tips).find(t=>t.playerId===pid&&t.matchKey===mk);
+    if(existing){ showLockedTip(mk,existing,el); return; }
+  }
   const match=MATCHES[mk];
   tipForm={hub:null,homeGoals:'',awayGoals:'',firstScorer:null,redCard:null,firstHalfGoal:null};
   el.innerHTML=`
@@ -824,8 +849,8 @@ window.submitTip=function(mk){
     hub:tipForm.hub, homeGoals:parseInt(hgVal), awayGoals:parseInt(agVal),
     firstScorer:tipForm.firstScorer, redCard:tipForm.redCard, firstHalfGoal:tipForm.firstHalfGoal,
     points:null, resolved:false, createdAt:Date.now() };
-  if(existing){ update(ref(db,'tips/'+existing),data); saveDeviceMapping(pid); showToast('Tipp oppdatert! 🎯'); }
-  else{ push(ref(db,'tips'),data); saveDeviceMapping(pid); showToast('Tipp registrert! 🎯'); }
+  if(existing){ showToast('Du har allerede tippet på denne kampen! 🔒'); return; }
+  push(ref(db,'tips'),data); saveDeviceMapping(pid); showToast('Tipp registrert! 🎯');
   document.getElementById('tip-status').innerHTML=`<div class="card" style="text-align:center;padding:.75rem"><div style="color:#4ecfa0;font-weight:500">✅ Registrert!</div><div style="font-size:13px;color:var(--text2);margin-top:4px">${MATCHES[mk].home} ${data.homeGoals}–${data.awayGoals} ${MATCHES[mk].away} (${data.hub})</div></div>`;
 };
 // ─── BET CATALOG ───
