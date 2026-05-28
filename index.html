@@ -106,8 +106,14 @@ select option{background:var(--bg3)}
 /* LIVE BOX */
 .live-box{background:var(--bg3);border:1px solid var(--border2);border-radius:12px;padding:1rem;margin-bottom:12px;text-align:center}
 .live-score-big{font-family:'Bebas Neue',sans-serif;font-size:42px;letter-spacing:2px;line-height:1}
+.live-clock{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px;color:var(--green);margin:2px 0}
 .live-badge{display:inline-block;background:var(--red);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;animation:pulse 1.5s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* TV EVENT BANNER */
+#tv-event-banner{position:fixed;top:0;left:0;right:0;z-index:300;padding:1.25rem 2rem;display:none;align-items:center;justify-content:center;gap:20px;animation:slideDown .35s ease}
+@keyframes slideDown{from{transform:translateY(-100%)}to{transform:translateY(0)}}
+.tv-event-feed{margin-top:10px;display:flex;flex-direction:column;gap:4px}
 
 /* HISTORY */
 .history-item{font-size:13px;color:var(--text2);padding:5px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
@@ -355,6 +361,7 @@ select option{background:var(--bg3)}
   </div>
 
   <!-- ===== TV ===== -->
+  <div id="tv-event-banner"></div>
   <div class="section" id="tab-tv">
 
     <!-- PODIUMS side by side -->
@@ -442,6 +449,9 @@ let selectedTipMatch='';
 let selectedBetMatch='';
 let devicePlayerId=null;
 let deviceIp=null;
+let matchClocks={};
+let knownEventKeys={};
+let bannerTimer;
 
 function isAdmin(){ return window.innerWidth>=900; }
 
@@ -705,18 +715,74 @@ async function fetchSofaScore(sofaId){
   }catch{return null;}
 }
 
+// ─── MATCH CLOCK ───
+function syncClock(mk, s){
+  if(['1H','2H','ET'].includes(s.status))
+    matchClocks[mk]={ elapsed:s.elapsed||0, pollTime:Date.now() };
+}
+function getClockDisplay(mk){
+  const s=liveScores[mk]; if(!s)return'';
+  if(s.status==='NS')return'Ikke startet';
+  if(s.status==='HT')return'HT';
+  if(s.status==='FT')return'FT';
+  const c=matchClocks[mk]; if(!c)return s.elapsed?`${s.elapsed}'`:'';
+  const sec=Math.floor((Date.now()-c.pollTime)/1000);
+  const total=c.elapsed*60+sec;
+  const m=Math.floor(total/60), ss=total%60;
+  return`${m}:${ss.toString().padStart(2,'0')}`;
+}
+
+// ─── LIVE EVENT DETECTION ───
+function checkNewEvents(mk, events){
+  if(!knownEventKeys[mk])knownEventKeys[mk]=new Set();
+  return events.filter(ev=>{
+    const k=`${ev.time?.elapsed}-${ev.type}-${ev.player?.name}`;
+    if(knownEventKeys[mk].has(k))return false;
+    knownEventKeys[mk].add(k); return true;
+  });
+}
+function showEventBanner(ev, mk){
+  const isGoal=ev.type==='Goal'&&ev.detail!=='Missed Penalty';
+  const isRed=ev.type==='Card'&&ev.detail==='Red Card';
+  if(!isGoal&&!isRed)return;
+  const banner=document.getElementById('tv-event-banner'); if(!banner)return;
+  const icon=isGoal?'⚽':'🟥';
+  const title=isGoal?(ev.detail==='Own Goal'?'SELVMÅL!':'MÅL!'):'RØDT KORT!';
+  const color=isGoal?'var(--green)':'var(--red)';
+  const match=MATCHES[mk];
+  banner.style.background=`linear-gradient(135deg,var(--bg2),var(--bg3))`;
+  banner.style.borderBottom=`4px solid ${color}`;
+  banner.innerHTML=`
+    <span style="font-size:56px;line-height:1">${icon}</span>
+    <div style="text-align:center">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:52px;letter-spacing:3px;color:${color};line-height:1">${title}</div>
+      <div style="font-size:20px;font-weight:600;margin-top:4px">${ev.player?.name||''} <span style="color:var(--text2);font-size:16px">${ev.time?.elapsed?ev.time.elapsed+"'":''}</span></div>
+      <div style="font-size:15px;color:var(--text2)">${ev.team?.name||''}</div>
+    </div>
+    <span style="font-size:56px;line-height:1">${icon}</span>`;
+  banner.style.display='flex';
+  clearTimeout(bannerTimer);
+  bannerTimer=setTimeout(()=>{ banner.style.display='none'; },7000);
+}
+
 async function refreshLive(){
   for(const[key,match]of Object.entries(MATCHES)){
     if(liveScores[key]?.status==='FT')continue;
     let s=null;
     if(match.sofaId)s=await fetchSofaScore(match.sofaId);
     else if(match.fixtureId)s=await fetchLive(match.fixtureId);
-    if(s){liveScores[key]=s;calcLivePoints(key,s);autoResolveBets(key,s);}
+    if(s){
+      const newEvs=checkNewEvents(key,s.events||[]);
+      liveScores[key]=s; syncClock(key,s);
+      calcLivePoints(key,s); autoResolveBets(key,s);
+      newEvs.forEach(ev=>showEventBanner(ev,key));
+    }
   }
   renderLiveBox();
   if(currentTab==='tv')renderTVLive();
 }
 refreshLive(); setInterval(refreshLive,20000);
+setInterval(()=>{ renderLiveBox(); if(currentTab==='tv')renderTVLive(); },1000);
 
 // Calculate live/final points for all tips of a match based on current score
 function calcLivePoints(mk, score){
@@ -783,8 +849,15 @@ function renderLiveBox(){
   const match=mk?MATCHES[mk]:null;
   if(!score||!match){ el.innerHTML=match?`<div class="live-box"><div style="color:var(--text3);font-size:14px">Ingen live data for ${match.label}</div></div>`:''; return; }
   const isLive=['1H','HT','2H','ET','P'].includes(score.status);
-  el.innerHTML=`<div class="live-box"><div style="font-size:12px;color:var(--text2);margin-bottom:6px">${isLive?'<span class="live-badge">LIVE</span>':score.status==='FT'?'✅ Ferdig':''} ${score.elapsed?score.elapsed+"'":''}
-  </div><div class="live-score-big">${score.homeGoals} – ${score.awayGoals}</div><div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text2);margin-top:6px"><span>${match.home}</span><span>${match.away}</span></div></div>`;
+  const clock=getClockDisplay(mk);
+  el.innerHTML=`<div class="live-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+      <span>${isLive?'<span class="live-badge">LIVE</span>':score.status==='FT'?'<span style="color:var(--green);font-size:12px;font-weight:600">✅ Ferdig</span>':''}</span>
+      <span class="live-clock">${clock}</span>
+    </div>
+    <div class="live-score-big">${score.homeGoals} – ${score.awayGoals}</div>
+    <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text2);margin-top:6px"><span>${match.home}</span><span>${match.away}</span></div>
+  </div>`;
 }
 
 // ─── TIPPING ───
@@ -1446,11 +1519,27 @@ function renderTVLive(){
   const entries=Object.entries(liveScores);
   if(!entries.length){ el.innerHTML='<div style="color:var(--text3);font-size:14px">Ingen live kamper</div>'; return; }
   el.innerHTML=entries.map(([mk,s])=>{
-    const m=MATCHES[mk]; const isLive=['1H','HT','2H','ET','P'].includes(s.status);
-    return`<div style="margin-bottom:16px">
-      <div style="font-size:13px;color:var(--text2);margin-bottom:4px">${isLive?'<span class="live-badge">LIVE</span>':s.status==='FT'?'✅':''} ${s.elapsed?s.elapsed+"'":''}  ${m?.label||mk}</div>
+    const m=MATCHES[mk];
+    const isLive=['1H','HT','2H','ET','P'].includes(s.status);
+    const isFT=s.status==='FT';
+    const clock=getClockDisplay(mk);
+    const importantEvs=(s.events||[]).filter(e=>e.type==='Goal'||(e.type==='Card'&&e.detail==='Red Card'));
+    return`<div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-size:13px;color:var(--text2)">${m?.label||mk}</span>
+        <span>${isLive?'<span class="live-badge">LIVE</span>':isFT?'<span style="color:var(--green);font-size:12px;font-weight:600">✅ FT</span>':''}</span>
+      </div>
       <div class="tv-live-score">${s.homeGoals} – ${s.awayGoals}</div>
-    </div>`;}).join('');
+      <div style="text-align:center;font-family:'Bebas Neue',sans-serif;font-size:32px;color:${isLive?'var(--green)':isFT?'var(--text2)':'var(--text3)'};letter-spacing:1px;margin:4px 0">${clock}</div>
+      ${importantEvs.length?`<div class="tv-event-feed">${importantEvs.map(e=>`
+        <div style="display:flex;align-items:center;gap:8px;font-size:14px">
+          <span>${e.type==='Goal'?'⚽':'🟥'}</span>
+          <span style="color:var(--text2);font-size:12px;min-width:28px">${e.time?.elapsed||''}'</span>
+          <span style="font-weight:500">${e.player?.name||''}</span>
+          <span style="color:var(--text3);font-size:12px">${e.team?.name||''}</span>
+        </div>`).join('')}</div>`:''}
+    </div>`;
+  }).join('');
 }
 
 function renderTVSlurkebet(){
