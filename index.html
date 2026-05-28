@@ -75,7 +75,7 @@ select option{background:var(--bg3)}
 .badge-open{background:var(--green-light);color:#4ecfa0}
 
 /* AVATARS */
-.avatar{width:44px;height:44px;border-radius:50%;border:2px solid var(--border2);background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;overflow:hidden;flex-shrink:0;color:var(--text)}
+.avatar{width:52px;height:62px;border-radius:50% 50% 45% 45% / 55% 55% 45% 45%;border:2px solid var(--border2);background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;overflow:hidden;flex-shrink:0;color:var(--text)}
 .avatar img{width:100%;height:100%;object-fit:cover}
 .avatar-upload{position:relative;cursor:pointer}
 .avatar-upload input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
@@ -161,7 +161,7 @@ select option{background:var(--bg3)}
 .mii-wrap{display:flex;flex-direction:column;align-items:center;margin-bottom:8px}
 .mii-head-wrap{position:relative}
 .mii-crown{position:absolute;top:-22px;left:50%;transform:translateX(-50%);font-size:20px;z-index:3}
-.mii-face{border-radius:50%;overflow:hidden;border:3px solid #fff;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--text);position:relative;z-index:2}
+.mii-face{border-radius:50% 50% 45% 45% / 58% 58% 42% 42%;overflow:hidden;border:3px solid #fff;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--text);position:relative;z-index:2}
 .mii-neck{width:14px;height:10px;background:#c8956c;margin:0 auto}
 .mii-body{border-radius:22px 22px 8px 8px;position:relative;display:flex;align-items:flex-start;justify-content:center;padding-top:8px;margin:0 auto}
 .mii-arms-l,.mii-arms-r{position:absolute;top:10px;width:18px;height:13px;border-radius:7px}
@@ -171,12 +171,12 @@ select option{background:var(--bg3)}
 .mii-leg{border-radius:0 0 7px 7px}
 
 /* SPOT SIZES */
-.spot-1 .mii-face{width:66px;height:66px;font-size:28px;border-color:gold;border-width:3px}
-.spot-2 .mii-face,.spot-3 .mii-face{width:52px;height:52px;font-size:22px}
-.spot-1 .mii-body{width:52px;height:60px}
-.spot-2 .mii-body,.spot-3 .mii-body{width:44px;height:52px}
-.spot-1 .mii-leg{width:14px;height:26px}
-.spot-2 .mii-leg,.spot-3 .mii-leg{width:12px;height:22px}
+.spot-1 .mii-face{width:78px;height:92px;font-size:34px;border-color:gold;border-width:3px}
+.spot-2 .mii-face,.spot-3 .mii-face{width:62px;height:74px;font-size:26px}
+.spot-1 .mii-body{width:62px;height:72px}
+.spot-2 .mii-body,.spot-3 .mii-body{width:52px;height:62px}
+.spot-1 .mii-leg{width:17px;height:32px}
+.spot-2 .mii-leg,.spot-3 .mii-leg{width:14px;height:26px}
 
 /* SPOT COLORS */
 .spot-1 .mii-body{background:#1D9E75}.spot-1 .mii-arms-l,.spot-1 .mii-arms-r{background:#0F6E56}.spot-1 .mii-leg{background:#063d2e}
@@ -244,7 +244,6 @@ select option{background:var(--bg3)}
     <button class="tab active" onclick="showTab('spillere')">Min oversikt</button>
     <button class="tab" onclick="showTab('tipping')">Tippekonk</button>
     <button class="tab" onclick="showTab('betting')">Slurkebet™</button>
-    <button class="tab" onclick="showTab('poeng')">Poeng</button>
     <button class="tab tab-tv" onclick="showTab('tv')">📺 Storskjerm</button>
   </div>
 </header>
@@ -261,43 +260,6 @@ select option{background:var(--bg3)}
     </div>
     <div id="player-list"></div>
     <div id="reset-wrap"></div>
-    <div id="test-panel" style="display:none;margin-top:16px">
-      <div class="card" style="border-color:var(--amber)">
-        <div class="card-label">🧪 Test Score</div>
-        <div class="row2" style="margin-bottom:10px">
-          <div class="field">
-            <label>Kamp</label>
-            <select id="test-match" onchange="updateTestLabels()">
-              <option value="FRA-SEN">FRA – SEN</option>
-              <option value="NOR-IRQ">NOR – IRQ</option>
-            </select>
-          </div>
-          <div class="field">
-            <label>Status</label>
-            <select id="test-status">
-              <option value="1H">1H — Live</option>
-              <option value="HT">HT — Pause</option>
-              <option value="2H">2H — Live</option>
-              <option value="FT">FT — Ferdig</option>
-            </select>
-          </div>
-        </div>
-        <div class="row2" style="margin-bottom:10px">
-          <div class="field"><label id="test-home-lbl">Hjemme</label><input type="number" id="test-hg" min="0" value="0"></div>
-          <div class="field"><label id="test-away-lbl">Borte</label><input type="number" id="test-ag" min="0" value="0"></div>
-        </div>
-        <div class="field" style="margin-bottom:10px"><label>Minutter spilt</label><input type="number" id="test-elapsed" min="0" max="90" value="45"></div>
-        <div style="margin-bottom:8px">
-          <div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:6px">HURTIG-EVENTS</div>
-          <div id="test-event-btns" style="display:flex;flex-wrap:wrap;gap:6px"></div>
-        </div>
-        <div id="test-events-display" style="font-size:12px;color:var(--amber);min-height:18px;margin-bottom:10px"></div>
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-primary" style="flex:1" onclick="applyTestScore()">▶ Apply</button>
-          <button class="btn" onclick="clearTestScore()">Reset</button>
-        </div>
-      </div>
-    </div>
   </div>
 
   <!-- ===== TIPPING ===== -->
@@ -352,13 +314,6 @@ select option{background:var(--bg3)}
 
     <div class="section-title" style="margin-top:1.5rem">Aktive bets</div>
     <div id="bets-list"></div>
-  </div>
-
-  <!-- ===== POENG ===== -->
-  <div class="section" id="tab-poeng">
-    <div class="section-title">Poengtavle</div>
-    <div id="scoreboard"></div>
-    <div id="history-section"></div>
   </div>
 
   <!-- ===== TV ===== -->
@@ -479,7 +434,7 @@ window.showTab=function(id){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   document.getElementById('tab-'+id).classList.add('active');
-  ['spillere','tipping','betting','poeng','tv'].forEach((t,i)=>{ const el=document.querySelectorAll('.tab')[i]; if(el)el.classList.toggle('active',t===id); });
+  ['spillere','tipping','betting','tv'].forEach((t,i)=>{ const el=document.querySelectorAll('.tab')[i]; if(el)el.classList.toggle('active',t===id); });
   const mw=document.getElementById('main-wrap');
   if(id==='tv'){ mw.style.maxWidth='none'; mw.style.padding='0'; }
   else{ mw.style.maxWidth=''; mw.style.padding=''; }
@@ -605,15 +560,12 @@ function renderAdminPlayers(){
       </div>`).join('')+'</div>';
   }
   document.getElementById('reset-wrap').innerHTML=`<button class="btn btn-sm btn-full" style="color:var(--red);border-color:var(--red-dark);margin-top:4px" onclick="resetAll()">🗑️ Nullstill alt</button>`;
-  const tp=document.getElementById('test-panel');
-  if(tp){ tp.style.display='block'; updateTestLabels(); }
 }
 
 function renderMyOverview(){
   document.getElementById('spillere-title').textContent='Min oversikt';
   document.getElementById('add-player-card').style.display='none';
   document.getElementById('reset-wrap').innerHTML='';
-  const tp=document.getElementById('test-panel'); if(tp)tp.style.display='none';
   const el=document.getElementById('player-list');
 
   if(!devicePlayerId||!players[devicePlayerId]){
@@ -1677,7 +1629,7 @@ function renderTV(){ renderTVPodium(); renderTVScore(); renderTVLive(); renderTV
 
 function miiHTML(p, id, spotClass){
   const hasImg=p&&p.avatar&&p.avatar.startsWith('data:');
-  const faceInner=hasImg?`<img src="${p.avatar}" alt="${p.name}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`:`<span>${p&&p.name?p.name.charAt(0).toUpperCase():'?'}</span>`;
+  const faceInner=hasImg?`<img src="${p.avatar}" alt="${p.name}" style="width:100%;height:100%;object-fit:cover;border-radius:50% 50% 45% 45% / 58% 58% 42% 42%">`:`<span>${p&&p.name?p.name.charAt(0).toUpperCase():'?'}</span>`;
   const isFirst=spotClass==='spot-1';
   return`<div class="mii-wrap">
     <div class="mii-head-wrap">
