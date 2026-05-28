@@ -423,8 +423,8 @@ const db = getDatabase(app);
 const RAPID_KEY = "86b71ea67bmsh076351ff0c7fb59p12fb39jsnb660034bd93f";
 
 const MATCHES = {
-  "FRA-SEN":{ label:"Frankrike – Senegal", home:"Frankrike", away:"Senegal", fixtureId:null },
-  "NOR-IRQ":{ label:"Norge – Irak", home:"Norge", away:"Irak", fixtureId:null }
+  "FRA-SEN":{ label:"Frankrike – Senegal", home:"Frankrike", away:"Senegal", fixtureId:null, sofaId:null },
+  "NOR-IRQ":{ label:"Norge – Irak", home:"Norge", away:"Irak", fixtureId:null, sofaId:null }
 };
 
 const MAX_SLURK_BUDGET = 20;
@@ -681,14 +681,42 @@ async function fetchLive(fixtureId){
     return{ home:fix.teams.home.name, away:fix.teams.away.name, homeGoals:fix.goals.home??'-', awayGoals:fix.goals.away??'-', status:fix.fixture.status.short, elapsed:fix.fixture.status.elapsed, events:fix.events||[], halftime: fix.score?.halftime ? { home: fix.score.halftime.home??0, away: fix.score.halftime.away??0 } : null };
   }catch{ return null; }
 }
+
+async function fetchSofaScore(sofaId){
+  if(!sofaId)return null;
+  try{
+    const h={'Accept':'application/json'};
+    const [evRes,incRes]=await Promise.all([
+      fetch(`https://api.sofascore.com/api/v1/event/${sofaId}`,{headers:h}),
+      fetch(`https://api.sofascore.com/api/v1/event/${sofaId}/incidents`,{headers:h})
+    ]);
+    if(!evRes.ok)return null;
+    const {event:ev}=await evRes.json();
+    const {incidents=[]}=incRes.ok?await incRes.json():{};
+    const SC={0:'NS',6:'1H',7:'HT',8:'2H',9:'ET',10:'P',100:'FT',110:'FT',120:'FT'};
+    const status=SC[ev.status?.code]||'NS';
+    const events=incidents.map(inc=>{
+      if(inc.incidentType==='goal')return{type:'Goal',detail:inc.incidentClass==='penalty'?'Penalty':inc.incidentClass==='own-goal'?'Own Goal':'Normal Goal',team:{name:inc.team?.name||''},player:{name:inc.player?.name||''},assist:inc.assist1?{name:inc.assist1.name}:null,time:{elapsed:inc.time||0}};
+      if(inc.incidentType==='card')return{type:'Card',detail:(inc.incidentClass==='red'||inc.incidentClass==='yellow-red')?'Red Card':'Yellow Card',team:{name:inc.team?.name||''},player:{name:inc.player?.name||''},time:{elapsed:inc.time||0}};
+      if(inc.incidentType==='substitution')return{type:'subst',player:{name:inc.playerOut?.name||''},time:{elapsed:inc.time||0}};
+      return null;
+    }).filter(Boolean);
+    return{home:ev.homeTeam.name,away:ev.awayTeam.name,homeGoals:ev.homeScore?.current??'-',awayGoals:ev.awayScore?.current??'-',status,elapsed:ev.time?.played||null,events,halftime:ev.homeScore?.period1!==undefined?{home:ev.homeScore.period1??0,away:ev.awayScore.period1??0}:null};
+  }catch{return null;}
+}
+
 async function refreshLive(){
   for(const[key,match]of Object.entries(MATCHES)){
-    if(match.fixtureId){ const s=await fetchLive(match.fixtureId); if(s){ liveScores[key]=s; calcLivePoints(key,s); autoResolveBets(key,s); } }
+    if(liveScores[key]?.status==='FT')continue;
+    let s=null;
+    if(match.sofaId)s=await fetchSofaScore(match.sofaId);
+    else if(match.fixtureId)s=await fetchLive(match.fixtureId);
+    if(s){liveScores[key]=s;calcLivePoints(key,s);autoResolveBets(key,s);}
   }
   renderLiveBox();
   if(currentTab==='tv')renderTVLive();
 }
-refreshLive(); setInterval(refreshLive,60000);
+refreshLive(); setInterval(refreshLive,120000);
 
 // Calculate live/final points for all tips of a match based on current score
 function calcLivePoints(mk, score){
