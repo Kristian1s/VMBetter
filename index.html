@@ -862,6 +862,7 @@ async function refreshLive(){
       newEvs.forEach(ev=>showEventBanner(ev,key));
       document.getElementById('sync-label').textContent=`Live ✓ ${new Date().toLocaleTimeString('no',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}`;
       document.getElementById('sync-dot').className='dot live';
+      if(currentTab==='betting')renderBetCatalog();
     }
   }
   renderLiveBox();
@@ -1285,6 +1286,66 @@ window.selectBetMatch=function(mk){
   });
   renderBetCatalog();
 };
+// ─── LIVE ODDS ENGINE ───
+function calcLiveOdds(bet, mk){
+  const s=liveScores[mk];
+  if(!s||s.status==='NS')return{odds:bet.odds,changed:false};
+  const hg=typeof s.homeGoals==='number'?s.homeGoals:0;
+  const ag=typeof s.awayGoals==='number'?s.awayGoals:0;
+  const total=hg+ag; const elapsed=s.elapsed||0; const id=bet.id;
+  const adj=(mult)=>({odds:Math.max(1.05,parseFloat((bet.odds*mult).toFixed(2))),changed:true,dir:mult<1?'down':'up'});
+  const same=()=>({odds:bet.odds,changed:false});
+
+  // Over X.5 goals — lower odds as goals pile up
+  const OVER={'o25':2.5,'o45':4.5,'ni-o35':3.5,'ni-o55':5.5};
+  if(OVER[id]!==undefined){
+    const needed=OVER[id]-total;
+    if(needed<=0.5)return adj(0.15);
+    if(needed<=1.5)return adj(0.5);
+    if(needed<=2.5)return adj(0.75);
+    return same();
+  }
+
+  // BTTS — one team scored, now just need the other
+  if(id==='btts'||id==='ni-btts'){
+    if((hg>0&&ag===0)||(ag>0&&hg===0))return adj(0.4);
+    return same();
+  }
+
+  // Clean sheet — gets easier the longer 0 holds
+  if(['cleanfra','cleansen','ni-clean'].includes(id)){
+    if(elapsed>75)return adj(0.4);
+    if(elapsed>60)return adj(0.6);
+    if(elapsed>45)return adj(0.75);
+    return same();
+  }
+
+  // First 15 min goal — gets harder the closer to 15 with no goal
+  if(id==='fg-15'||id==='ni-fg-15'){
+    if(total===0&&elapsed>10)return adj(1.5+elapsed*0.05);
+    if(total>0)return adj(0.2);
+    return same();
+  }
+
+  // Half-time goals — time pressure in 1H
+  if((id==='h1-goal'||id==='ni-h1goal')&&['1H'].includes(s.status)){
+    if(total>0)return adj(0.25);
+    if(elapsed>35)return adj(2.0);
+    if(elapsed>25)return adj(1.4);
+    return same();
+  }
+
+  // No goal 1H — gets easier if 0-0 and time passing
+  if((id==='h1-nogoal')&&s.status==='1H'){
+    if(total>0)return adj(8); // basically lost
+    if(elapsed>35)return adj(0.4);
+    if(elapsed>25)return adj(0.65);
+    return same();
+  }
+
+  return same();
+}
+
 window.renderBetCatalog = function(){
   const mk = selectedBetMatch;
   const el = document.getElementById('bet-catalog');
@@ -1295,23 +1356,24 @@ window.renderBetCatalog = function(){
   const wonIds=new Set(Object.values(bets).filter(b=>b.matchKey===mk&&b.status==='won').map(b=>b.betId));
   const lostIds=new Set(Object.values(bets).filter(b=>b.matchKey===mk&&b.status==='lost').map(b=>b.betId));
 
-  el.innerHTML = catalog.categories.map(cat=>`
-    <div class="cat-section">
-      <div class="cat-header">${cat.icon} ${cat.label}</div>
-      ${cat.bets.map(b=>{
-        const placed=openBetsByBetId[b.id];
-        const won=wonIds.has(b.id); const lost=lostIds.has(b.id);
-        const disabled=placed||won||lost;
-        let tag='';
-        if(placed) tag=`<span style="color:var(--green);font-size:12px">✓ Plassert av ${placed.placerName}</span>`;
-        if(won)    tag=`<span style="color:var(--green);font-size:12px">🎉 TREFF!</span>`;
-        if(lost)   tag=`<span style="color:var(--text3);font-size:12px">❌ Bom</span>`;
-        return`<div class="bet-item${disabled?' already-placed':''}" onclick="${disabled?'':` selectBet('${mk}','${b.id}')`}">
-          <div class="bet-item-text">${b.text} ${tag}</div>
-          <div class="bet-item-odds"><span class="odds-badge">${b.odds}×</span></div>
-        </div>`;
-      }).join('')}
-    </div>`).join('');
+  el.innerHTML = catalog.categories.map(cat=>{
+    const items=cat.bets.map(b=>{
+      if(wonIds.has(b.id)||lostIds.has(b.id))return''; // completely hide resolved bets
+      const placed=openBetsByBetId[b.id];
+      const live=calcLiveOdds(b,mk);
+      const oddsDisplay=live.odds;
+      const oddsTag=live.changed
+        ?`<span class="odds-badge" style="background:${live.dir==='down'?'var(--green-light)':'var(--red-light)'}; color:${live.dir==='down'?'var(--green)':'var(--red)'}">${oddsDisplay}× ${live.dir==='down'?'↓':'↑'}</span>`
+        :`<span class="odds-badge">${oddsDisplay}×</span>`;
+      const tag=placed?`<span style="color:var(--green);font-size:12px">✓ ${placed.placerName}</span>`:'';
+      return`<div class="bet-item${placed?' already-placed':''}" onclick="${placed?'':` selectBet('${mk}','${b.id}')`}">
+        <div class="bet-item-text">${b.text} ${tag}</div>
+        <div class="bet-item-odds">${oddsTag}</div>
+      </div>`;
+    }).join('');
+    if(!items.trim())return''; // hide category if all bets resolved
+    return`<div class="cat-section"><div class="cat-header">${cat.icon} ${cat.label}</div>${items}</div>`;
+  }).join('');
 };
 
 window.selectBet = function(mk, betId){
