@@ -457,8 +457,8 @@ function isAdmin(){ return window.innerWidth>=900; }
 
 // ─── FIREBASE ───
 onValue(ref(db,'players'), s=>{ players=s.val()||{}; setSync(true); renderPlayers(); renderBettorSelect(); renderPlayerSelects(); if(currentTab==='poeng')renderScore(); if(currentTab==='tv')renderTV(); });
-onValue(ref(db,'bets'), s=>{ bets=s.val()||{}; if(currentTab==='betting')renderBets(); if(currentTab==='tv')renderTV(); if(currentTab==='spillere')renderMyOverview(); });
-onValue(ref(db,'tips'), s=>{ tips=s.val()||{}; if(currentTab==='poeng')renderScore(); if(currentTab==='tv')renderTV(); if(currentTab==='spillere')renderMyOverview(); });
+onValue(ref(db,'bets'), s=>{ bets=s.val()||{}; if(currentTab==='betting')renderBets(); if(currentTab==='tv')renderTV(); if(currentTab==='spillere')renderPlayers(); });
+onValue(ref(db,'tips'), s=>{ tips=s.val()||{}; if(currentTab==='poeng')renderScore(); if(currentTab==='tv')renderTV(); if(currentTab==='spillere')renderPlayers(); });
 
 function setSync(live){ document.getElementById('sync-dot').className='dot'+(live?' live':''); document.getElementById('sync-label').textContent=live?'Live':'Kobler til...'; }
 
@@ -573,14 +573,21 @@ function renderMyOverview(){
 
   if(!devicePlayerId||!players[devicePlayerId]){
     const list=Object.entries(players);
-    if(!list.length){ el.innerHTML='<div class="empty">Ingen spillere enda 🎯</div>'; return; }
+    const pickerRows=list.map(([id,p])=>`
+      <div class="player-row" onclick="selectMyPlayer('${id}')" style="cursor:pointer">
+        ${avatarEl(p,id)}
+        <div style="flex:1;margin-left:12px"><div style="font-size:16px;font-weight:500">${p.name}</div></div>
+        <span style="color:var(--green);font-size:20px">→</span>
+      </div>`).join('');
     el.innerHTML=`<div style="font-size:15px;font-weight:500;text-align:center;margin-bottom:12px;color:var(--text2)">Hvem er du?</div>
-      <div class="card">`+list.map(([id,p])=>`
-        <div class="player-row" onclick="selectMyPlayer('${id}')" style="cursor:pointer">
-          ${avatarEl(p,id)}
-          <div style="flex:1;margin-left:12px"><div style="font-size:16px;font-weight:500">${p.name}</div></div>
-          <span style="color:var(--green);font-size:20px">→</span>
-        </div>`).join('')+'</div>';
+      ${list.length?`<div class="card">${pickerRows}</div>`:''}
+      <div class="card" style="margin-top:8px">
+        <div style="font-size:13px;color:var(--text2);margin-bottom:8px">Ikke i listen? Legg deg til:</div>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="new-player-name" placeholder="Ditt navn" style="flex:1" onkeydown="if(event.key==='Enter')addSelf()">
+          <button class="btn btn-primary" onclick="addSelf()">Legg til</button>
+        </div>
+      </div>`;
     return;
   }
 
@@ -663,6 +670,13 @@ function renderMyOverview(){
 }
 window.selectMyPlayer=function(pid){ saveDeviceMapping(pid); renderPlayers(); };
 window.clearDevicePlayer=function(){ devicePlayerId=null; renderPlayers(); };
+window.addSelf=function(){
+  const inp=document.getElementById('new-player-name');
+  const name=inp?.value.trim(); if(!name)return;
+  if(Object.values(players).some(p=>p.name===name)){ showToast('Navn finnes allerede!'); return; }
+  const newRef=push(ref(db,'players'),{name,tipPoints:0,sipScore:0,avatar:null});
+  newRef.then(r=>{ saveDeviceMapping(r.key); showToast(`Velkommen, ${name}! 🎉`); });
+};
 
 function renderPlayerSelects(){
   const sel=document.getElementById('tip-player-select'); if(!sel)return;
