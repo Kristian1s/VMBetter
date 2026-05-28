@@ -788,6 +788,20 @@ function renderLiveBox(){
 }
 
 // ─── TIPPING ───
+function showKickoffLock(mk,score,el){
+  const match=MATCHES[mk];
+  const done=score.status==='FT';
+  el.innerHTML=`<div class="card" style="border-color:${done?'var(--green)':'var(--red)'}">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span style="font-size:22px">${done?'✅':'🔴'}</span>
+      <div style="flex:1">
+        <div style="font-weight:600;font-size:15px">${done?'Kamp ferdig':'Kampen er i gang!'}</div>
+        <div style="font-size:12px;color:var(--text2)">Tipping er stengt</div>
+      </div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:32px;letter-spacing:1px">${score.homeGoals} – ${score.awayGoals}</div>
+    </div>
+  </div>`;
+}
 function showLockedTip(mk,t,el){
   const match=MATCHES[mk];
   const hubLabel=t.hub==='H'?match?.home:t.hub==='B'?match?.away:'Uavgjort';
@@ -820,6 +834,8 @@ window.renderTipForm=function(){
   const mk=selectedTipMatch;
   renderLiveBox();
   const el=document.getElementById('tip-form'); if(!mk){ el.innerHTML=''; return; }
+  const score=liveScores[mk];
+  if(score&&score.status!=='NS'){ showKickoffLock(mk,score,el); return; }
   const pid=document.getElementById('tip-player-select').value;
   if(pid){
     const existing=Object.values(tips).find(t=>t.playerId===pid&&t.matchKey===mk);
@@ -865,6 +881,7 @@ window.renderTipForm=function(){
 window.selHub=function(v){ tipForm.hub=v; ['H','U','B'].forEach(x=>document.getElementById('hub-'+x)?.classList.toggle('selected',x===v)); };
 window.selBonus=function(field,val,el){ tipForm[field]=val; const pfx={firstScorer:'fs',redCard:'rc',firstHalfGoal:'fhg'}[field]; document.querySelectorAll(`[id^="${pfx}-"]`).forEach(e=>e.classList.remove('selected')); el.classList.add('selected'); };
 window.submitTip=function(mk){
+  if(liveScores[mk]&&liveScores[mk].status!=='NS'){ showToast('Kampen har startet – tipping stengt! 🔒'); return; }
   const pid=document.getElementById('tip-player-select').value;
   const hgVal=document.getElementById('tip-hg')?.value;
   const agVal=document.getElementById('tip-ag')?.value;
