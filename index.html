@@ -230,8 +230,8 @@ select option{background:var(--bg3)}
   </div>
   <div class="tabs">
     <button class="tab active" onclick="showTab('spillere')">Spillere</button>
-    <button class="tab" onclick="showTab('tipping')">Tipping</button>
-    <button class="tab" onclick="showTab('betting')">Betting</button>
+    <button class="tab" onclick="showTab('tipping')">Tippekonk</button>
+    <button class="tab" onclick="showTab('betting')">Slurkebet™</button>
     <button class="tab" onclick="showTab('poeng')">Poeng</button>
     <button class="tab tab-tv" onclick="showTab('tv')">📺 Storskjerm</button>
   </div>
@@ -252,17 +252,16 @@ select option{background:var(--bg3)}
 
   <!-- ===== TIPPING ===== -->
   <div class="section" id="tab-tipping">
-    <div class="section-title">Tipping</div>
+    <div class="section-title">Tippekonk</div>
     <div id="live-score-box"></div>
     <div class="card">
       <div class="field"><label>Velg kamp</label>
-        <select id="tip-match-select" onchange="renderTipForm()">
-          <option value="">Velg kamp...</option>
-          <option value="FRA-SEN">Frankrike – Senegal</option>
-          <option value="NOR-IRQ">Norge – Irak</option>
-        </select>
+        <div class="hub-row" style="grid-template-columns:1fr 1fr">
+          <div class="hub-btn" id="match-btn-FRA-SEN" onclick="selectTipMatch('FRA-SEN')">🇫🇷 vs 🇸🇳<br><small style="font-size:11px;opacity:.7">Frankrike – Senegal</small></div>
+          <div class="hub-btn" id="match-btn-NOR-IRQ" onclick="selectTipMatch('NOR-IRQ')">🇳🇴 vs 🇮🇶<br><small style="font-size:11px;opacity:.7">Norge – Irak</small></div>
+        </div>
       </div>
-      <div class="field"><label>Hvem tipper?</label>
+      <div class="field" id="tip-player-field"><label id="tip-player-label">Hvem tipper?</label>
         <select id="tip-player-select"><option value="">Velg spiller...</option></select>
       </div>
     </div>
@@ -271,7 +270,7 @@ select option{background:var(--bg3)}
 
   <!-- ===== BETTING ===== -->
   <div class="section" id="tab-betting">
-    <div class="section-title">Slurke-betting</div>
+    <div class="section-title">Slurkebet™</div>
 
     <!-- Step 1: pick match -->
     <div class="card">
@@ -323,7 +322,7 @@ select option{background:var(--bg3)}
 
     <!-- PODIUM (full width) -->
     <div class="podium-wrap tv-card" id="tv-podium">
-      <div class="podium-headline">VM <span>BETTING</span> 🏆</div>
+      <div class="podium-headline">VM <span>SLURKEBET</span>™ 🏆</div>
       <div class="podium-stage" id="podium-stage"></div>
     </div>
 
@@ -392,6 +391,9 @@ let currentTab='spillere';
 let liveScores={};
 let tipForm={ hub:null, homeGoals:'', awayGoals:'', firstScorer:null, redCard:null, firstHalfGoal:null };
 let toastTimer;
+let selectedTipMatch='';
+let devicePlayerId=null;
+let deviceIp=null;
 
 function isAdmin(){ return window.innerWidth>=900; }
 
@@ -495,9 +497,11 @@ function renderPlayers(){
 
 function renderPlayerSelects(){
   const sel=document.getElementById('tip-player-select'); if(!sel)return;
-  const cur=sel.value;
+  const cur=sel.value||devicePlayerId;
   sel.innerHTML='<option value="">Velg spiller...</option>'+Object.entries(players).map(([id,p])=>`<option value="${id}">${p.name}</option>`).join('');
   if(cur)sel.value=cur;
+  const lbl=document.getElementById('tip-player-label');
+  if(lbl&&devicePlayerId&&players[devicePlayerId])lbl.textContent=`Hvem tipper? 📱 ${players[devicePlayerId].name} oppdaget`;
 }
 
 function renderBettorSelect(){
@@ -587,7 +591,7 @@ function getTipPoints(t){
 
 function renderLiveBox(){
   const el=document.getElementById('live-score-box'); if(!el)return;
-  const mk=document.getElementById('tip-match-select')?.value;
+  const mk=selectedTipMatch;
   const score=mk?liveScores[mk]:null;
   const match=mk?MATCHES[mk]:null;
   if(!score||!match){ el.innerHTML=match?`<div class="live-box"><div style="color:var(--text3);font-size:14px">Ingen live data for ${match.label}</div></div>`:''; return; }
@@ -597,8 +601,16 @@ function renderLiveBox(){
 }
 
 // ─── TIPPING ───
+window.selectTipMatch=function(mk){
+  selectedTipMatch=mk;
+  Object.keys(MATCHES).forEach(k=>{
+    const btn=document.getElementById('match-btn-'+k);
+    if(btn)btn.classList.toggle('selected',k===mk);
+  });
+  renderTipForm();
+};
 window.renderTipForm=function(){
-  const mk=document.getElementById('tip-match-select').value;
+  const mk=selectedTipMatch;
   renderLiveBox();
   const el=document.getElementById('tip-form'); if(!mk){ el.innerHTML=''; return; }
   const match=MATCHES[mk];
@@ -653,8 +665,8 @@ window.submitTip=function(mk){
     hub:tipForm.hub, homeGoals:parseInt(hgVal), awayGoals:parseInt(agVal),
     firstScorer:tipForm.firstScorer, redCard:tipForm.redCard, firstHalfGoal:tipForm.firstHalfGoal,
     points:null, resolved:false, createdAt:Date.now() };
-  if(existing){ update(ref(db,'tips/'+existing),data); showToast('Tipp oppdatert! 🎯'); }
-  else{ push(ref(db,'tips'),data); showToast('Tipp registrert! 🎯'); }
+  if(existing){ update(ref(db,'tips/'+existing),data); saveDeviceMapping(pid); showToast('Tipp oppdatert! 🎯'); }
+  else{ push(ref(db,'tips'),data); saveDeviceMapping(pid); showToast('Tipp registrert! 🎯'); }
   document.getElementById('tip-status').innerHTML=`<div class="card" style="text-align:center;padding:.75rem"><div style="color:#4ecfa0;font-weight:500">✅ Registrert!</div><div style="font-size:13px;color:var(--text2);margin-top:4px">${MATCHES[mk].home} ${data.homeGoals}–${data.awayGoals} ${MATCHES[mk].away} (${data.hub})</div></div>`;
 };
 // ─── BET CATALOG ───
@@ -911,6 +923,7 @@ window.selectBet = function(mk, betId){
   pendingBet = { matchKey:mk, betId, betText:bet.text, odds:bet.odds };
   const sel = document.getElementById('bet-placer-sel');
   sel.innerHTML = '<option value="">Velg spiller...</option>' + Object.entries(players).map(([id,p])=>`<option value="${id}">${p.name}</option>`).join('');
+  if(devicePlayerId)sel.value=devicePlayerId;
   document.getElementById('bet-place-desc').textContent = bet.text;
   document.getElementById('bet-place-odds').textContent = `Odds: ${bet.odds}× · Du drikker innsatsen med én gang`;
   document.getElementById('bet-stake').value = '2';
@@ -934,6 +947,7 @@ window.confirmBet = function(){
   if(!pid){ showToast('Velg spiller!'); return; }
   if(stake<1){ showToast('Minst 1 slurk!'); return; }
   const payout = Math.round(stake * pendingBet.odds);
+  saveDeviceMapping(pid);
   push(ref(db,'bets'),{
     matchKey:pendingBet.matchKey,
     matchLabel:BET_CATALOG[pendingBet.matchKey]?.home+'–'+BET_CATALOG[pendingBet.matchKey]?.away,
@@ -1193,6 +1207,32 @@ function renderTVBets(){
       <div style="font-size:12px;color:var(--text2)">${b.placerName} · 🍺${b.stake} → 🎉${b.payout}</div>
     </div>`).join('')+'</div>';
 }
+
+// ─── DEVICE IP AUTO-SELECT ───
+async function detectDevicePlayer(){
+  try{
+    const res=await fetch('https://api.ipify.org?format=json');
+    const {ip}=await res.json();
+    deviceIp=ip;
+    const safeIp=ip.replace(/\./g,'_').replace(/:/g,'-');
+    const snap=await new Promise(resolve=>onValue(ref(db,'ipmap/'+safeIp),resolve,{onlyOnce:true}));
+    const pid=snap.val();
+    if(pid&&players[pid]){
+      devicePlayerId=pid;
+      renderPlayerSelects();
+    }
+  }catch(e){}
+}
+async function saveDeviceMapping(pid){
+  if(!deviceIp){
+    try{ const r=await fetch('https://api.ipify.org?format=json'); deviceIp=(await r.json()).ip; }catch{ return; }
+  }
+  const safeIp=deviceIp.replace(/\./g,'_').replace(/:/g,'-');
+  set(ref(db,'ipmap/'+safeIp),pid);
+  devicePlayerId=pid;
+  renderPlayerSelects();
+}
+detectDevicePlayer();
 
 // ─── TOAST ───
 function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.style.opacity='1'; clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.style.opacity='0',3000); }
