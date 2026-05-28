@@ -984,11 +984,12 @@ function renderBets(){
         <span style="color:var(--text)">${b.placerName}</span> · 🍺${b.stake} inn → 🎉${b.payout} ut
       </div>
       ${isAdmin()?`<div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-sm" onclick="deleteBet('${id}')">Slett</button>
+        <button class="btn btn-sm btn-red" onclick="deleteBet('${id}')">🗑️ Slett bet</button>
       </div>`:''}
     </div>`).join('');
 }
-window.deleteBet=function(id){ remove(ref(db,'bets/'+id)); };
+window.deleteBet=function(id){ if(confirm('Slette dette bettet?'))remove(ref(db,'bets/'+id)); };
+window.deleteTip=function(id){ if(confirm('Slette dette tippet?'))remove(ref(db,'tips/'+id)); };
 // ─── SCOREBOARD ───
 function getLiveTipPoints(playerId){
   return Object.values(tips).filter(t=>t.playerId===playerId).reduce((sum,t)=>sum+getTipPoints(t),0);
@@ -1015,22 +1016,23 @@ function renderScore(){
 
   const histEl=document.getElementById('history-section');
   let html='';
-  const tipList=Object.values(tips);
+  const tipList=Object.entries(tips);
   if(tipList.length){
     const byMatch={};
-    tipList.forEach(t=>{ if(!byMatch[t.matchKey])byMatch[t.matchKey]=[]; byMatch[t.matchKey].push(t); });
+    tipList.forEach(([id,t])=>{ if(!byMatch[t.matchKey])byMatch[t.matchKey]=[]; byMatch[t.matchKey].push([id,t]); });
     html+=Object.entries(byMatch).map(([mk,ts])=>{
       const score=liveScores[mk];
       const isLive=score&&['1H','HT','2H','ET','P'].includes(score.status);
       const isFT=score&&score.status==='FT';
       return`<div class="card" style="margin-bottom:12px">
         <div class="card-label">${MATCHES[mk]?.label||mk} ${isLive?'🔴 LIVE':isFT?'✅ Ferdig':'⏳'}</div>
-        ${ts.map(t=>{
+        ${ts.map(([tid,t])=>{
           const pts=getTipPoints(t);
           return`<div class="history-item">
             <span>${t.resolved?(pts>=7?'🏆':pts>=4?'✅':'🟡'):isLive?'🔴':'⏳'}</span>
             <span style="flex:1">${t.playerName}: ${t.homeGoals}–${t.awayGoals} (${t.hub})</span>
             <span style="color:var(--amber);font-weight:600">${pts}p${!t.resolved&&isLive?' 🔴':''}</span>
+            ${isAdmin()?`<button class="btn btn-sm btn-red" style="padding:3px 8px;font-size:11px" onclick="deleteTip('${tid}')">🗑️</button>`:''}
           </div>`;}).join('')}
       </div>`;}).join('');
   }
