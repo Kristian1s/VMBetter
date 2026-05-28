@@ -706,27 +706,38 @@ async function fetchLive(fixtureId){
   }catch{ return null; }
 }
 
+async function sofaFetch(url){
+  // Try direct first, fall back to CORS proxy
+  try{
+    const r=await fetch(url,{headers:{'Accept':'application/json'}});
+    if(r.ok)return r;
+  }catch{}
+  try{
+    const r=await fetch('https://corsproxy.io/?'+encodeURIComponent(url));
+    if(r.ok)return r;
+  }catch{}
+  return null;
+}
+
 async function fetchSofaScore(sofaId){
   if(!sofaId)return null;
   try{
-    const h={'Accept':'application/json'};
-    const [evRes,incRes]=await Promise.all([
-      fetch(`https://api.sofascore.com/api/v1/event/${sofaId}`,{headers:h}),
-      fetch(`https://api.sofascore.com/api/v1/event/${sofaId}/incidents`,{headers:h})
-    ]);
-    if(!evRes.ok)return null;
+    const evRes=await sofaFetch(`https://api.sofascore.com/api/v1/event/${sofaId}`);
+    if(!evRes){ document.getElementById('sync-label').textContent='SofaScore: ingen data'; return null; }
     const {event:ev}=await evRes.json();
-    const {incidents=[]}=incRes.ok?await incRes.json():{};
+    const incRes=await sofaFetch(`https://api.sofascore.com/api/v1/event/${sofaId}/incidents`);
+    const {incidents=[]}=incRes?await incRes.json():{};
     const SC={0:'NS',6:'1H',7:'HT',8:'2H',9:'ET',10:'P',100:'FT',110:'FT',120:'FT'};
     const status=SC[ev.status?.code]||'NS';
     const events=incidents.map(inc=>{
       if(inc.incidentType==='goal')return{type:'Goal',detail:inc.incidentClass==='penalty'?'Penalty':inc.incidentClass==='own-goal'?'Own Goal':'Normal Goal',team:{name:inc.team?.name||''},player:{name:inc.player?.name||''},assist:inc.assist1?{name:inc.assist1.name}:null,time:{elapsed:inc.time||0}};
       if(inc.incidentType==='card')return{type:'Card',detail:(inc.incidentClass==='red'||inc.incidentClass==='yellow-red')?'Red Card':'Yellow Card',team:{name:inc.team?.name||''},player:{name:inc.player?.name||''},time:{elapsed:inc.time||0}};
-      if(inc.incidentType==='substitution')return{type:'subst',player:{name:inc.playerOut?.name||''},time:{elapsed:inc.time||0}};
+      if(inc.incidentType==='substitution')return{type:'subst',player:{name:inc.playerOut?.name||''},assist:inc.playerIn?{name:inc.playerIn.name}:null,time:{elapsed:inc.time||0}};
+      if(inc.incidentType==='missedPenalty'||inc.incidentType==='miss')return{type:'Miss',detail:'Missed Penalty',team:{name:inc.team?.name||''},player:{name:inc.player?.name||''},time:{elapsed:inc.time||0}};
       return null;
     }).filter(Boolean);
     return{home:ev.homeTeam.name,away:ev.awayTeam.name,homeGoals:ev.homeScore?.current??'-',awayGoals:ev.awayScore?.current??'-',status,elapsed:ev.time?.played||null,events,halftime:ev.homeScore?.period1!==undefined?{home:ev.homeScore.period1??0,away:ev.awayScore.period1??0}:null};
-  }catch{return null;}
+  }catch(e){ document.getElementById('sync-label').textContent='Feil: '+e.message; return null; }
 }
 
 // ─── MATCH CLOCK ───
@@ -799,6 +810,8 @@ async function refreshLive(){
       liveScores[key]=s; syncClock(key,s);
       calcLivePoints(key,s); autoResolveBets(key,s);
       newEvs.forEach(ev=>showEventBanner(ev,key));
+      document.getElementById('sync-label').textContent=`Live ✓ ${new Date().toLocaleTimeString('no',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}`;
+      document.getElementById('sync-dot').className='dot live';
     }
   }
   renderLiveBox();
