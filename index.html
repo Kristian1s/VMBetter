@@ -248,6 +248,7 @@ select option{background:var(--bg3)}
   <!-- ===== MIN OVERSIKT / SPILLERE ===== -->
   <div class="section active" id="tab-spillere">
     <div class="section-title" id="spillere-title">Min oversikt</div>
+    <div id="match-admin-panel"></div>
     <div class="card" id="add-player-card">
       <div class="field"><label>Navn</label><input type="text" id="player-name" placeholder="f.eks. Anders" onkeydown="if(event.key==='Enter')addPlayer()"></div>
       <button class="btn btn-primary btn-full" onclick="addPlayer()">Legg til spiller</button>
@@ -550,7 +551,7 @@ function renderAdminPlayers(){
   document.getElementById('spillere-title').textContent='Spillere';
   document.getElementById('add-player-card').style.display='block';
 
-  // ── Match management at top ──
+  // ── Match management panel (uses dedicated container, no duplicates) ──
   const matchEntries=Object.entries(MATCHES);
   const matchRows=matchEntries.map(([mk,m])=>`
     <div class="player-row">
@@ -560,11 +561,11 @@ function renderAdminPlayers(){
       </div>
       <button class="btn btn-sm btn-red" onclick="removeMatch('${mk}')">×</button>
     </div>`).join('');
-  const matchCard=`<div class="card" style="margin-bottom:12px;border-color:var(--blue)">
+  document.getElementById('match-admin-panel').innerHTML=`<div class="card" style="margin-bottom:12px;border-color:var(--blue)">
     <div class="card-label">⚽ Kamper</div>
-    ${matchEntries.length ? matchRows : '<div style="font-size:13px;color:var(--amber);margin-bottom:10px">⚠️ Ingen kamper lagt til ennå</div>'}
-    <div style="border-top:1px solid var(--border);margin-top:10px;padding-top:10px">
-      <div style="font-size:12px;color:var(--text2);margin-bottom:6px">Legg til kamp via ESPN ID:</div>
+    ${matchEntries.length ? matchRows : '<div style="font-size:13px;color:var(--amber);margin-bottom:8px">⚠️ Ingen kamper lagt til ennå</div>'}
+    <button class="btn btn-sm" style="margin-top:8px;width:100%" onclick="document.getElementById('add-match-form').style.display=document.getElementById('add-match-form').style.display==='none'?'block':'none'">+ Legg til kamp</button>
+    <div id="add-match-form" style="display:none;margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
       <select id="add-match-league" style="margin-bottom:8px;font-size:13px;width:100%">
         <option value="fifa.world">VM 2026 (fifa.world)</option>
         <option value="fifa.friendly">Vennekamp (fifa.friendly)</option>
@@ -576,13 +577,11 @@ function renderAdminPlayers(){
       </select>
       <div style="display:flex;gap:8px">
         <input type="number" id="add-match-id" placeholder="ESPN event ID" style="flex:1">
-        <button class="btn btn-primary" onclick="fetchAndAddMatch()">+ Legg til</button>
+        <button class="btn btn-primary" onclick="fetchAndAddMatch()">Hent</button>
       </div>
       <div style="font-size:11px;color:var(--text3);margin-top:5px">Finn ID på espn.com — siste tall i kampens URL</div>
     </div>
   </div>`;
-  // Insert match card before player list
-  document.getElementById('add-player-card').insertAdjacentHTML('afterend', matchCard);
 
   const el=document.getElementById('player-list');
   const list=Object.entries(players);
