@@ -229,7 +229,7 @@ select option{background:var(--bg3)}
     </div>
   </div>
   <div class="tabs">
-    <button class="tab active" onclick="showTab('spillere')">Spillere</button>
+    <button class="tab active" onclick="showTab('spillere')">Min oversikt</button>
     <button class="tab" onclick="showTab('tipping')">Tippekonk</button>
     <button class="tab" onclick="showTab('betting')">Slurkebet™</button>
     <button class="tab" onclick="showTab('poeng')">Poeng</button>
@@ -239,10 +239,10 @@ select option{background:var(--bg3)}
 
 <div class="main" id="main-wrap">
 
-  <!-- ===== SPILLERE ===== -->
+  <!-- ===== MIN OVERSIKT / SPILLERE ===== -->
   <div class="section active" id="tab-spillere">
-    <div class="section-title">Spillere</div>
-    <div class="card">
+    <div class="section-title" id="spillere-title">Min oversikt</div>
+    <div class="card" id="add-player-card">
       <div class="field"><label>Navn</label><input type="text" id="player-name" placeholder="f.eks. Anders" onkeydown="if(event.key==='Enter')addPlayer()"></div>
       <button class="btn btn-primary btn-full" onclick="addPlayer()">Legg til spiller</button>
     </div>
@@ -447,8 +447,8 @@ function isAdmin(){ return window.innerWidth>=900; }
 
 // ─── FIREBASE ───
 onValue(ref(db,'players'), s=>{ players=s.val()||{}; setSync(true); renderPlayers(); renderBettorSelect(); renderPlayerSelects(); if(currentTab==='poeng')renderScore(); if(currentTab==='tv')renderTV(); });
-onValue(ref(db,'bets'), s=>{ bets=s.val()||{}; if(currentTab==='betting')renderBets(); if(currentTab==='tv')renderTV(); });
-onValue(ref(db,'tips'), s=>{ tips=s.val()||{}; if(currentTab==='poeng')renderScore(); if(currentTab==='tv')renderTV(); });
+onValue(ref(db,'bets'), s=>{ bets=s.val()||{}; if(currentTab==='betting')renderBets(); if(currentTab==='tv')renderTV(); if(currentTab==='spillere')renderMyOverview(); });
+onValue(ref(db,'tips'), s=>{ tips=s.val()||{}; if(currentTab==='poeng')renderScore(); if(currentTab==='tv')renderTV(); if(currentTab==='spillere')renderMyOverview(); });
 
 function setSync(live){ document.getElementById('sync-dot').className='dot'+(live?' live':''); document.getElementById('sync-label').textContent=live?'Live':'Kobler til...'; }
 
@@ -531,19 +531,128 @@ function avatarEl(p, id, editable=false){
 }
 
 function renderPlayers(){
+  if(isAdmin()){ renderAdminPlayers(); return; }
+  renderMyOverview();
+}
+
+function renderAdminPlayers(){
+  document.getElementById('spillere-title').textContent='Spillere';
+  document.getElementById('add-player-card').style.display='block';
   const el=document.getElementById('player-list');
   const list=Object.entries(players);
-  if(!list.length){ el.innerHTML='<div class="empty">Ingen spillere enda</div>'; return; }
-  el.innerHTML='<div class="card">'+list.map(([id,p])=>`
-    <div class="player-row">
-      ${avatarEl(p,id,true)}
-      <div style="flex:1"><div style="font-size:15px;font-weight:500">${p.name}</div><div style="font-size:12px;color:var(--text2)">Trykk på avatar for bilde 📸</div></div>
-      ${isAdmin()?`<button class="btn btn-sm" style="color:var(--red)" onclick="removePlayer('${id}')">×</button>`:''}
-    </div>`).join('')+'</div>';
-  document.getElementById('reset-wrap').innerHTML=isAdmin()?`<button class="btn btn-sm btn-full" style="color:var(--red);border-color:var(--red-dark);margin-top:4px" onclick="resetAll()">🗑️ Nullstill alt</button>`:'';
+  if(!list.length){ el.innerHTML='<div class="empty">Ingen spillere enda</div>'; }
+  else{
+    el.innerHTML='<div class="card">'+list.map(([id,p])=>`
+      <div class="player-row">
+        ${avatarEl(p,id,true)}
+        <div style="flex:1"><div style="font-size:15px;font-weight:500">${p.name}</div><div style="font-size:12px;color:var(--text2)">Trykk på avatar for bilde 📸</div></div>
+        <button class="btn btn-sm" style="color:var(--red)" onclick="removePlayer('${id}')">×</button>
+      </div>`).join('')+'</div>';
+  }
+  document.getElementById('reset-wrap').innerHTML=`<button class="btn btn-sm btn-full" style="color:var(--red);border-color:var(--red-dark);margin-top:4px" onclick="resetAll()">🗑️ Nullstill alt</button>`;
   const tp=document.getElementById('test-panel');
-  if(tp){ tp.style.display=isAdmin()?'block':'none'; if(isAdmin())updateTestLabels(); }
+  if(tp){ tp.style.display='block'; updateTestLabels(); }
 }
+
+function renderMyOverview(){
+  document.getElementById('spillere-title').textContent='Min oversikt';
+  document.getElementById('add-player-card').style.display='none';
+  document.getElementById('reset-wrap').innerHTML='';
+  const tp=document.getElementById('test-panel'); if(tp)tp.style.display='none';
+  const el=document.getElementById('player-list');
+
+  if(!devicePlayerId||!players[devicePlayerId]){
+    const list=Object.entries(players);
+    if(!list.length){ el.innerHTML='<div class="empty">Ingen spillere enda 🎯</div>'; return; }
+    el.innerHTML=`<div style="font-size:15px;font-weight:500;text-align:center;margin-bottom:12px;color:var(--text2)">Hvem er du?</div>
+      <div class="card">`+list.map(([id,p])=>`
+        <div class="player-row" onclick="selectMyPlayer('${id}')" style="cursor:pointer">
+          ${avatarEl(p,id)}
+          <div style="flex:1;margin-left:12px"><div style="font-size:16px;font-weight:500">${p.name}</div></div>
+          <span style="color:var(--green);font-size:20px">→</span>
+        </div>`).join('')+'</div>';
+    return;
+  }
+
+  const p=players[devicePlayerId];
+  const myTips=Object.values(tips).filter(t=>t.playerId===devicePlayerId);
+  const myBets=Object.entries(bets).filter(([,b])=>b.placerId===devicePlayerId);
+  const tipPts=getLiveTipPoints(devicePlayerId);
+  const sip=p.sipScore||0; const tot=tipPts+sip;
+  const spent=getSlurkerSpent(devicePlayerId);
+  const wonSlurk=getSlurkerWon(devicePlayerId);
+  const remaining=getRemainingBudget(devicePlayerId);
+  const budgetPct=Math.min(100,Math.round((spent/MAX_SLURK_BUDGET)*100));
+
+  let html=`
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:14px">
+        ${avatarEl(p,devicePlayerId,true)}
+        <div style="flex:1">
+          <div style="font-size:20px;font-weight:600">${p.name}</div>
+          <div style="font-size:13px;color:var(--text2);margin-top:2px">🎯 ${tipPts}p · 🍺 ${sip>=0?'+':''}${sip}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;color:${tot>=0?'var(--green)':'var(--red)'}">${tot>0?'+':''}${tot}</div>
+          <div style="font-size:11px;color:var(--text3)">totalt</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">Slurkebet™ budget</div>
+      <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text2);margin-bottom:8px">
+        <span>Brukt: <strong style="color:var(--text)">${spent}/${MAX_SLURK_BUDGET}</strong></span>
+        <span>Vunnet: <strong style="color:var(--green)">+${wonSlurk}</strong></span>
+        <span>Gjenstår: <strong style="color:${remaining<=5?'var(--red)':remaining<=10?'var(--amber)':'var(--green)'}">${remaining}</strong></span>
+      </div>
+      <div style="background:var(--bg3);border-radius:6px;height:8px;overflow:hidden">
+        <div style="width:${budgetPct}%;background:var(--amber);height:100%;border-radius:6px;transition:width .3s"></div>
+      </div>
+    </div>`;
+
+  if(myTips.length){
+    html+=`<div class="card"><div class="card-label">Mine tippekonk</div>`;
+    myTips.forEach(t=>{
+      const match=MATCHES[t.matchKey];
+      const score=liveScores[t.matchKey];
+      const pts=getTipPoints(t);
+      const isLive=score&&['1H','HT','2H','ET','P'].includes(score.status);
+      const isFT=score&&score.status==='FT';
+      html+=`<div style="padding:8px 0;border-bottom:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+          <span style="font-size:12px;color:var(--text3)">${match?.label||t.matchKey} ${isLive?'🔴':isFT?'✅':'⏳'}</span>
+          <span style="color:var(--amber);font-weight:600">${pts}p${isLive?' 🔴':''}</span>
+        </div>
+        <div style="font-size:14px">${t.hub} · ${t.homeGoals}–${t.awayGoals}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px">Scorer: ${t.firstScorer==='H'?match?.home||'H':t.firstScorer==='A'?match?.away||'A':'Ingen'} · Rødt: ${t.redCard==='Y'?'Ja':'Nei'} · 1.omg: ${t.firstHalfGoal==='Y'?'Ja':'Nei'}</div>
+      </div>`;
+    });
+    html+=`</div>`;
+  }
+
+  if(myBets.length){
+    html+=`<div class="card"><div class="card-label">Mine slurkebet</div>`;
+    myBets.forEach(([,b])=>{
+      const sc=b.status==='won'?'var(--green)':b.status==='lost'?'var(--red)':'var(--amber)';
+      const sl=b.status==='won'?'🎉 TREFF':b.status==='lost'?'❌ Bom':'⏳ Åpen';
+      html+=`<div style="padding:8px 0;border-bottom:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+          <span style="font-size:12px;color:var(--text3)">${b.matchLabel||''} · ${b.odds}×</span>
+          <span style="font-size:12px;font-weight:600;color:${sc}">${sl}</span>
+        </div>
+        <div style="font-size:14px;font-weight:500">${b.desc}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px">🍺 ${b.stake} inn → 🎉 ${b.payout} ut${b.status==='won'?` <strong style="color:var(--green)">· Del ut ${b.payout}!</strong>`:''}</div>
+      </div>`;
+    });
+    html+=`</div>`;
+  }
+
+  if(!myTips.length&&!myBets.length) html+=`<div class="empty">Ingen tips eller bets enda 🎯</div>`;
+  html+=`<button class="btn btn-sm" style="margin-top:8px;width:100%;color:var(--text3)" onclick="clearDevicePlayer()">Bytt spiller</button>`;
+  el.innerHTML=html;
+}
+window.selectMyPlayer=function(pid){ saveDeviceMapping(pid); renderPlayers(); };
+window.clearDevicePlayer=function(){ devicePlayerId=null; renderPlayers(); };
 
 function renderPlayerSelects(){
   const sel=document.getElementById('tip-player-select'); if(!sel)return;
@@ -1390,6 +1499,7 @@ async function detectDevicePlayer(){
     if(pid&&players[pid]){
       devicePlayerId=pid;
       renderPlayerSelects();
+      if(currentTab==='spillere')renderMyOverview();
     }
   }catch(e){}
 }
