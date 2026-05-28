@@ -299,10 +299,7 @@ select option{background:var(--bg3)}
     <div id="live-score-box"></div>
     <div class="card">
       <div class="field"><label>Velg kamp</label>
-        <div class="hub-row" style="grid-template-columns:1fr 1fr">
-          <div class="hub-btn" id="match-btn-FRA-SEN" onclick="selectTipMatch('FRA-SEN')"><img src="https://flagcdn.com/20x15/ie.png" style="vertical-align:middle;margin-right:4px"> IRE vs QAT <img src="https://flagcdn.com/20x15/qa.png" style="vertical-align:middle;margin-left:4px"></div>
-          <div class="hub-btn" id="match-btn-NOR-IRQ" onclick="selectTipMatch('NOR-IRQ')"><img src="https://flagcdn.com/20x15/no.png" style="vertical-align:middle;margin-right:4px"> NOR vs IRQ <img src="https://flagcdn.com/20x15/iq.png" style="vertical-align:middle;margin-left:4px"></div>
-        </div>
+        <div id="tip-match-buttons" class="hub-row"></div>
       </div>
       <div class="field" id="tip-player-field"><label id="tip-player-label">Hvem tipper?</label>
         <select id="tip-player-select" onchange="renderTipForm()"><option value="">Velg spiller...</option></select>
@@ -318,10 +315,7 @@ select option{background:var(--bg3)}
     <!-- Step 1: pick match -->
     <div class="card">
       <div class="field"><label>Velg kamp</label>
-        <div class="hub-row" style="grid-template-columns:1fr 1fr">
-          <div class="hub-btn" id="bet-match-btn-FRA-SEN" onclick="selectBetMatch('FRA-SEN')"><img src="https://flagcdn.com/20x15/ie.png" style="vertical-align:middle;margin-right:4px"> IRE vs QAT <img src="https://flagcdn.com/20x15/qa.png" style="vertical-align:middle;margin-left:4px"></div>
-          <div class="hub-btn" id="bet-match-btn-NOR-IRQ" onclick="selectBetMatch('NOR-IRQ')"><img src="https://flagcdn.com/20x15/no.png" style="vertical-align:middle;margin-right:4px"> NOR vs IRQ <img src="https://flagcdn.com/20x15/iq.png" style="vertical-align:middle;margin-left:4px"></div>
-        </div>
+        <div id="bet-match-buttons" class="hub-row"></div>
       </div>
     </div>
 
@@ -429,10 +423,8 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 const RAPID_KEY = "86b71ea67bmsh076351ff0c7fb59p12fb39jsnb660034bd93f";
 
-const MATCHES = {
-  "FRA-SEN":{ label:"Irland – Qatar", home:"Republic of Ireland", away:"Qatar", fixtureId:null, sofaId:null, espnId:401860781, espnLeague:"fifa.friendly" },
-  "NOR-IRQ":{ label:"Norge – Irak", home:"Norge", away:"Irak", fixtureId:null, sofaId:null, espnId:null, espnLeague:null }
-};
+let MATCHES = {};   // populated from Firebase config/matches
+let BET_CATALOG = {}; // generated from MATCHES via generateBetCatalog()
 
 const MAX_SLURK_BUDGET = 20;
 function getSlurkerSpent(pid){ return Object.values(bets).filter(b=>b.placerId===pid).reduce((s,b)=>s+(b.stake||0),0); }
@@ -456,6 +448,14 @@ let bannerTimer;
 function isAdmin(){ return window.innerWidth>=900; }
 
 // ─── FIREBASE ───
+onValue(ref(db,'config/matches'), s=>{
+  MATCHES=s.val()||{};
+  rebuildBetCatalogs();
+  renderMatchButtons();
+  if(currentTab==='betting'){renderBetCatalog();renderBets();}
+  if(currentTab==='tipping'){renderTipForm();}
+  if(currentTab==='spillere'&&isAdmin())renderAdminPlayers();
+});
 onValue(ref(db,'players'), s=>{ players=s.val()||{}; setSync(true); renderPlayers(); renderBettorSelect(); renderPlayerSelects(); if(currentTab==='poeng')renderScore(); if(currentTab==='tv')renderTV(); });
 onValue(ref(db,'bets'), s=>{ bets=s.val()||{}; if(currentTab==='betting')renderBets(); if(currentTab==='tv')renderTV(); if(currentTab==='spillere')renderPlayers(); });
 onValue(ref(db,'tips'), s=>{ tips=s.val()||{}; if(currentTab==='poeng')renderScore(); if(currentTab==='tv')renderTV(); if(currentTab==='spillere')renderPlayers(); });
@@ -562,6 +562,37 @@ function renderAdminPlayers(){
   document.getElementById('reset-wrap').innerHTML=`<button class="btn btn-sm btn-full" style="color:var(--red);border-color:var(--red-dark);margin-top:4px" onclick="resetAll()">🗑️ Nullstill alt</button>`;
   const tp=document.getElementById('test-panel');
   if(tp){ tp.style.display='block'; updateTestLabels(); }
+  // Match management
+  const matchEntries=Object.entries(MATCHES);
+  const matchHtml=matchEntries.map(([mk,m])=>`
+    <div class="player-row">
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:500">${teamFlag(m.home)}${getTeamAbbr(m.home)} vs ${teamFlag(m.away)}${getTeamAbbr(m.away)}</div>
+        <div style="font-size:11px;color:var(--text3)">${m.espnLeague||'–'} · ESPN: ${m.espnId||'–'}</div>
+      </div>
+      <button class="btn btn-sm btn-red" onclick="removeMatch('${mk}')">×</button>
+    </div>`).join('');
+  const matchMgmt=`<div class="card" style="margin-top:12px;border-color:var(--blue)">
+    <div class="card-label">⚽ Kamper</div>
+    ${matchEntries.length?matchHtml:'<div style="font-size:13px;color:var(--text3);margin-bottom:10px">Ingen kamper ennå</div>'}
+    <div style="border-top:1px solid var(--border);margin-top:10px;padding-top:10px">
+      <select id="add-match-league" style="margin-bottom:8px;font-size:13px">
+        <option value="fifa.world">VM 2026 (fifa.world)</option>
+        <option value="fifa.friendly">Vennekamp (fifa.friendly)</option>
+        <option value="uefa.euro_q">EM-kval (UEFA)</option>
+        <option value="concacaf.world-q">CONCACAF kval</option>
+        <option value="eng.1">Premier League</option>
+        <option value="esp.1">La Liga</option>
+        <option value="ger.1">Bundesliga</option>
+      </select>
+      <div style="display:flex;gap:8px">
+        <input type="number" id="add-match-id" placeholder="ESPN event ID" style="flex:1;font-size:14px">
+        <button class="btn btn-primary" onclick="fetchAndAddMatch()">+ Hent</button>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px">Finn ID på espn.com – siste tall i URL</div>
+    </div>
+  </div>`;
+  document.getElementById('reset-wrap').innerHTML += matchMgmt;
 }
 
 function renderMyOverview(){
@@ -1059,9 +1090,110 @@ window.submitTip=function(mk){
   document.getElementById('tip-status').innerHTML=`<div class="card" style="text-align:center;padding:.75rem"><div style="color:#4ecfa0;font-weight:500">✅ Registrert!</div><div style="font-size:13px;color:var(--text2);margin-top:4px">${MATCHES[mk].home} ${data.homeGoals}–${data.awayGoals} ${MATCHES[mk].away} (${data.hub})</div></div>`;
 };
 // ─── BET CATALOG ───
-// ─── BET CATALOG WITH RESOLVERS ───
-// resolve(score, events, htScore) returns true=win, false=lose, null=not yet decidable
-const BET_CATALOG = {
+// ─── TEAM FLAG / ABBR HELPERS ───
+const FLAG_MAP={'france':'fr','senegal':'sn','norway':'no','iraq':'iq','ireland':'ie','republic of ireland':'ie','qatar':'qa','england':'gb-eng','germany':'de','spain':'es','brazil':'br','argentina':'ar','portugal':'pt','netherlands':'nl','belgium':'be','croatia':'hr','morocco':'ma','united states':'us','usa':'us','mexico':'mx','canada':'ca','australia':'au','japan':'jp','south korea':'kr','korea republic':'kr','saudi arabia':'sa','turkey':'tr','switzerland':'ch','denmark':'dk','sweden':'se','poland':'pl','czechia':'cz','czech republic':'cz','ukraine':'ua','austria':'at','scotland':'gb-sct','wales':'gb-wls','south africa':'za','ghana':'gh','cameroon':'cm','nigeria':'ng','ivory coast':'ci','colombia':'co','chile':'cl','ecuador':'ec','peru':'pe','uruguay':'uy','iran':'ir','egypt':'eg','algeria':'dz','tunisia':'tn','russia':'ru','serbia':'rs','italy':'it','albania':'al','georgia':'ge','slovenia':'si','slovakia':'sk','finland':'fi','iceland':'is','greece':'gr','romania':'ro','hungary':'hu','new zealand':'nz','china':'cn','united arab emirates':'ae','indonesia':'id','venezuela':'ve','paraguay':'py','bolivia':'bo','kenya':'ke','mali':'ml','senegal':'sn','mali':'ml'};
+const ABBR_MAP={'france':'FRA','senegal':'SEN','norway':'NOR','iraq':'IRQ','ireland':'IRL','republic of ireland':'IRL','qatar':'QAT','england':'ENG','germany':'GER','spain':'ESP','brazil':'BRA','argentina':'ARG','portugal':'POR','netherlands':'NED','belgium':'BEL','croatia':'CRO','morocco':'MAR','united states':'USA','usa':'USA','mexico':'MEX','canada':'CAN','australia':'AUS','japan':'JPN','south korea':'KOR','korea republic':'KOR','saudi arabia':'KSA','turkey':'TUR','switzerland':'SUI','denmark':'DEN','sweden':'SWE','poland':'POL','czechia':'CZE','czech republic':'CZE','ukraine':'UKR','austria':'AUT','scotland':'SCO','wales':'WAL','south africa':'RSA','ghana':'GHA','cameroon':'CMR','nigeria':'NGA','ivory coast':'CIV','colombia':'COL','chile':'CHI','ecuador':'ECU','peru':'PER','uruguay':'URU','iran':'IRN','egypt':'EGY','algeria':'ALG','tunisia':'TUN','russia':'RUS','serbia':'SRB','italy':'ITA','albania':'ALB','georgia':'GEO','slovenia':'SVN','slovakia':'SVK','finland':'FIN','iceland':'ISL','greece':'GRE','romania':'ROU','hungary':'HUN','new zealand':'NZL','china':'CHN','united arab emirates':'UAE','indonesia':'IDN','venezuela':'VEN','paraguay':'PAR','bolivia':'BOL'};
+function teamFlag(name){
+  if(!name)return'';
+  const n=name.toLowerCase();
+  for(const[k,v]of Object.entries(FLAG_MAP)){ if(n.includes(k))return`<img src="https://flagcdn.com/20x15/${v}.png" style="vertical-align:middle;margin:0 3px">`; }
+  return'';
+}
+function getTeamAbbr(name){
+  if(!name)return'???';
+  const n=name.toLowerCase();
+  for(const[k,v]of Object.entries(ABBR_MAP)){ if(n.includes(k))return v; }
+  return name.replace(/[^a-zA-Z ]/g,'').trim().split(' ').map(w=>w[0]||'').join('').substring(0,3).toUpperCase();
+}
+
+// ─── GENERIC BET CATALOG GENERATOR ───
+function generateBetCatalog(mk, home, away, homeKey, awayKey){
+  const hk=(homeKey||home).toLowerCase();
+  const ak=(awayKey||away).toLowerCase();
+  const ha=getTeamAbbr(home); const aa=getTeamAbbr(away);
+  return{ home, away, homeKey:hk, awayKey:ak, categories:[
+    { icon:"⚽", label:"Mål", bets:[
+      { id:"fg-home",    text:`${ha} scorer først`,               odds:1.5,  resolve:(s,ev,ht,fin)=>firstScorerTeam(ev,hk,fin) },
+      { id:"fg-away",    text:`${aa} scorer først`,               odds:3.5,  resolve:(s,ev,ht,fin)=>firstScorerTeam(ev,ak,fin) },
+      { id:"fg-15",      text:"Mål innen de første 15 min",       odds:2.5,  resolve:(s,ev,ht,fin)=>goalBefore(ev,16,fin) },
+      { id:"o15",        text:"Over 1,5 mål totalt",              odds:1.3,  resolve:(s,ev,ht,fin)=>overGoals(s,1.5,fin) },
+      { id:"o25",        text:"Over 2,5 mål totalt",              odds:1.8,  resolve:(s,ev,ht,fin)=>overGoals(s,2.5,fin) },
+      { id:"o35",        text:"Over 3,5 mål totalt",              odds:2.5,  resolve:(s,ev,ht,fin)=>overGoals(s,3.5,fin) },
+      { id:"o45",        text:"Over 4,5 mål totalt",              odds:3.5,  resolve:(s,ev,ht,fin)=>overGoals(s,4.5,fin) },
+      { id:"btts",       text:"Begge lag scorer",                 odds:2.0,  resolve:(s,ev,ht,fin)=>bothTeamsScored(s,fin) },
+      { id:"clean-h",    text:`${ha} holder nullen`,              odds:2.0,  resolve:(s,ev,ht,fin)=>fin?s.awayGoals===0:null },
+      { id:"clean-a",    text:`${aa} holder nullen`,              odds:5.0,  resolve:(s,ev,ht,fin)=>fin?s.homeGoals===0:null },
+    ]},
+    { icon:"🟨", label:"Kort & disiplin", bets:[
+      { id:"rc-any",     text:"Rødt kort i kampen",               odds:3.5,  resolve:(s,ev,ht,fin)=>hasCard(ev,"Red Card",fin) },
+      { id:"yc-o3",      text:"Over 3 gule kort totalt",          odds:2.0,  resolve:(s,ev,ht,fin)=>overCards(ev,"Yellow Card",3,fin) },
+      { id:"yc-o5",      text:"Over 5 gule kort totalt",          odds:4.0,  resolve:(s,ev,ht,fin)=>overCards(ev,"Yellow Card",5,fin) },
+      { id:"pen-any",    text:"Straffespark i kampen",            odds:3.0,  resolve:(s,ev,ht,fin)=>hasPenalty(ev,fin) },
+      { id:"pen-scored", text:"Straffespark scores",              odds:3.5,  resolve:(s,ev,ht,fin)=>penaltyScored(ev,fin) },
+      { id:"pen-miss",   text:"Straffespark brennes",             odds:9.0,  resolve:(s,ev,ht,fin)=>penaltyMissed(ev,fin) },
+    ]},
+    { icon:"⏱️", label:"Omganger", bets:[
+      { id:"h1-goal",    text:"Mål i 1. omgang",                  odds:1.5,  resolve:(s,ev,ht)=>ht?(ht.home+ht.away)>0:null },
+      { id:"h1-nogoal",  text:"Ingen mål i 1. omgang",            odds:3.0,  resolve:(s,ev,ht)=>ht?(ht.home+ht.away)===0:null },
+      { id:"h1-home",    text:`${ha} leder til pause`,            odds:1.8,  resolve:(s,ev,ht)=>ht?ht.home>ht.away:null },
+      { id:"h1-away",    text:`${aa} leder til pause`,            odds:5.0,  resolve:(s,ev,ht)=>ht?ht.away>ht.home:null },
+      { id:"h1-draw",    text:"Uavgjort til pause",               odds:3.0,  resolve:(s,ev,ht)=>ht?ht.home===ht.away:null },
+      { id:"h2-more",    text:"Flest mål i 2. omgang",            odds:1.8,  resolve:(s,ev,ht,fin)=>fin&&ht?((s.homeGoals+s.awayGoals)-(ht.home+ht.away))>(ht.home+ht.away):null },
+      { id:"sub5",       text:"Totalt 5 eller flere bytter",      odds:1.5,  resolve:(s,ev,ht,fin)=>fin?countSubs(ev)>=5:countSubs(ev)>=5?true:null },
+    ]},
+    { icon:"🎯", label:"Eksakt sluttresultat", bets:[
+      { id:"res-10", text:`1–0 til ${ha}`, odds:5.0,  resolve:(s,ev,ht,fin)=>fin?s.homeGoals===1&&s.awayGoals===0:null },
+      { id:"res-20", text:`2–0 til ${ha}`, odds:5.5,  resolve:(s,ev,ht,fin)=>fin?s.homeGoals===2&&s.awayGoals===0:null },
+      { id:"res-21", text:`2–1 til ${ha}`, odds:6.0,  resolve:(s,ev,ht,fin)=>fin?s.homeGoals===2&&s.awayGoals===1:null },
+      { id:"res-30", text:`3–0 til ${ha}`, odds:7.0,  resolve:(s,ev,ht,fin)=>fin?s.homeGoals===3&&s.awayGoals===0:null },
+      { id:"res-00", text:"0–0 uavgjort",  odds:9.0,  resolve:(s,ev,ht,fin)=>fin?s.homeGoals===0&&s.awayGoals===0:null },
+      { id:"res-11", text:"1–1 uavgjort",  odds:7.0,  resolve:(s,ev,ht,fin)=>fin?s.homeGoals===1&&s.awayGoals===1:null },
+      { id:"res-01", text:`0–1 til ${aa}`, odds:9.0,  resolve:(s,ev,ht,fin)=>fin?s.homeGoals===0&&s.awayGoals===1:null },
+      { id:"res-02", text:`0–2 til ${aa}`, odds:12.0, resolve:(s,ev,ht,fin)=>fin?s.homeGoals===0&&s.awayGoals===2:null },
+    ]},
+    { icon:"🌟", label:"Spesial", bets:[
+      { id:"owngoal",    text:"Selvmål i kampen",                 odds:6.0,  resolve:(s,ev,ht,fin)=>hasOwnGoal(ev,fin) },
+      { id:"away-lead",  text:`${aa} leder på noe tidspunkt`,    odds:4.5,  resolve:(s,ev,ht,fin)=>{let h=0,a=0; for(const e of goalEvents(ev||[])){if(e.team?.name?.toLowerCase().includes(hk))h++;else a++;if(a>h)return true;} return fin?false:null;} },
+    ]},
+  ]};
+}
+function rebuildBetCatalogs(){
+  BET_CATALOG={};
+  for(const[mk,m]of Object.entries(MATCHES))
+    BET_CATALOG[mk]=generateBetCatalog(mk,m.home,m.away,m.homeKey,m.awayKey);
+}
+function renderMatchButtons(){
+  const list=Object.entries(MATCHES);
+  const cols=Math.max(1,Math.min(list.length,3));
+  ['tip-match-buttons','bet-match-buttons'].forEach(cid=>{
+    const el=document.getElementById(cid); if(!el)return;
+    const isBet=cid.startsWith('bet');
+    el.style.gridTemplateColumns=`repeat(${cols},1fr)`;
+    el.innerHTML=list.map(([mk,m])=>`<div class="hub-btn" id="${isBet?'bet-match-btn':'match-btn'}-${mk}" onclick="${isBet?'selectBetMatch':'selectTipMatch'}('${mk}')">${teamFlag(m.home)}${getTeamAbbr(m.home)} vs ${teamFlag(m.away)}${getTeamAbbr(m.away)}</div>`).join('');
+    const sel=isBet?selectedBetMatch:selectedTipMatch;
+    if(sel)document.getElementById((isBet?'bet-match-btn':'match-btn')+'-'+sel)?.classList.add('selected');
+  });
+}
+
+// ─── ADMIN MATCH MANAGEMENT ───
+window.fetchAndAddMatch=async function(){
+  const league=document.getElementById('add-match-league').value;
+  const espnId=parseInt(document.getElementById('add-match-id').value);
+  if(!espnId){showToast('Skriv inn ESPN event ID!');return;}
+  showToast('Henter kamp fra ESPN...');
+  const s=await fetchESPN(league,espnId);
+  if(!s){showToast('Fant ikke kampen – sjekk ID og league ⚠️');return;}
+  const mk=`${getTeamAbbr(s.home)}-${getTeamAbbr(s.away)}`;
+  await set(ref(db,`config/matches/${mk}`),{label:`${getTeamAbbr(s.home)} – ${getTeamAbbr(s.away)}`,home:s.home,away:s.away,homeKey:s.home.toLowerCase(),awayKey:s.away.toLowerCase(),espnId,espnLeague:league,sofaId:null,fixtureId:null});
+  document.getElementById('add-match-id').value='';
+  showToast(`${getTeamAbbr(s.home)} – ${getTeamAbbr(s.away)} lagt til ✅`);
+};
+window.removeMatch=function(mk){
+  if(confirm(`Fjerne ${MATCHES[mk]?.label}?`))remove(ref(db,`config/matches/${mk}`));
+};
+
+// ─── OLD BET CATALOG REMOVED — see generateBetCatalog() above ───
+const _UNUSED_BET_CATALOG = {
   "FRA-SEN": {
     home:"Frankrike", away:"Senegal",
     homeKey:"france", awayKey:"senegal",
@@ -1199,11 +1331,6 @@ function hasOwnGoal(ev,fin){ if(ev.some(e=>e.type==='Goal'&&e.detail==='Own Goal
 function playerAssist(ev,name,fin){ if(ev.some(e=>e.type==='Goal'&&e.assist?.name?.toLowerCase().includes(name.toLowerCase())))return true; return fin?false:null; }
 function playerSubbedOff(ev,name,fin){ if(ev.some(e=>e.type==='subst'&&e.player?.name?.toLowerCase().includes(name.toLowerCase())))return true; return fin?false:null; }
 function countSubs(ev){ return ev.filter(e=>e.type==='subst').length; }
-function senegalLedAtSomePoint(ev,fin){
-  let h=0,a=0;
-  for(const e of goalEvents(ev)){ if(e.team?.name?.toLowerCase().includes('france'))h++; else a++; if(a>h)return true; }
-  return fin?false:null;
-}
 
 // ─── FLAT BET LOOKUP ───
 function getBetDef(mk, betId){
@@ -1297,7 +1424,7 @@ function calcLiveOdds(bet, mk){
   const same=()=>({odds:bet.odds,changed:false});
 
   // Over X.5 goals — lower odds as goals pile up
-  const OVER={'o25':2.5,'o45':4.5,'ni-o35':3.5,'ni-o55':5.5};
+  const OVER={'o15':1.5,'o25':2.5,'o35':3.5,'o45':4.5};
   if(OVER[id]!==undefined){
     const needed=OVER[id]-total;
     if(needed<=0.5)return adj(0.15);
@@ -1307,13 +1434,13 @@ function calcLiveOdds(bet, mk){
   }
 
   // BTTS — one team scored, now just need the other
-  if(id==='btts'||id==='ni-btts'){
+  if(id==='btts'){
     if((hg>0&&ag===0)||(ag>0&&hg===0))return adj(0.4);
     return same();
   }
 
   // Clean sheet — gets easier the longer 0 holds
-  if(['cleanfra','cleansen','ni-clean'].includes(id)){
+  if(id==='clean-h'||id==='clean-a'){
     if(elapsed>75)return adj(0.4);
     if(elapsed>60)return adj(0.6);
     if(elapsed>45)return adj(0.75);
@@ -1328,15 +1455,15 @@ function calcLiveOdds(bet, mk){
   }
 
   // Half-time goals — time pressure in 1H
-  if((id==='h1-goal'||id==='ni-h1goal')&&['1H'].includes(s.status)){
+  if(id==='h1-goal'&&s.status==='1H'){
     if(total>0)return adj(0.25);
     if(elapsed>35)return adj(2.0);
     if(elapsed>25)return adj(1.4);
     return same();
   }
 
-  // No goal 1H — gets easier if 0-0 and time passing
-  if((id==='h1-nogoal')&&s.status==='1H'){
+  // No goal 1H — gets harder if 0-0 and time passing
+  if(id==='h1-nogoal'&&s.status==='1H'){
     if(total>0)return adj(8); // basically lost
     if(elapsed>35)return adj(0.4);
     if(elapsed>25)return adj(0.65);
@@ -1350,7 +1477,19 @@ window.renderBetCatalog = function(){
   const mk = selectedBetMatch;
   const el = document.getElementById('bet-catalog');
   if(!mk){ el.innerHTML=''; return; }
-  const catalog = BET_CATALOG[mk]; if(!catalog){ el.innerHTML=''; return; }
+  const score=liveScores[mk];
+  if(score&&score.status!=='NS'){
+    const done=score.status==='FT';
+    el.innerHTML=`<div class="card" style="border-color:${done?'var(--green)':'var(--red)'}">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:22px">${done?'✅':'🔒'}</span>
+        <div style="flex:1"><div style="font-weight:600">${done?'Kamp ferdig':'Kampen er i gang – Slurkebet stengt!'}</div>
+        <div style="font-size:12px;color:var(--text2)">Ingen nye bets kan plasseres</div></div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:28px">${score.homeGoals} – ${score.awayGoals}</div>
+      </div></div>`;
+    return;
+  }
+  const catalog = BET_CATALOG[mk]; if(!catalog){ el.innerHTML='<div class="empty">Ingen bets tilgjengelig</div>'; return; }
   const openBetsByBetId={};
   Object.values(bets).filter(b=>b.matchKey===mk&&b.status==='open').forEach(b=>{ openBetsByBetId[b.betId]=b; });
   const wonIds=new Set(Object.values(bets).filter(b=>b.matchKey===mk&&b.status==='won').map(b=>b.betId));
