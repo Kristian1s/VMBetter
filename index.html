@@ -828,8 +828,8 @@ function getClockDisplay(mk){
   const c=matchClocks[mk]; if(!c)return s.elapsed?`${s.elapsed}'`:'';
   const sec=Math.floor((Date.now()-c.pollTime)/1000);
   const total=c.elapsed*60+sec;
-  const m=Math.floor(total/60), ss=total%60;
-  return`${m}:${ss.toString().padStart(2,'0')}`;
+  const m=Math.floor(total/60);
+  return`${m}'`;
 }
 
 // ─── LIVE EVENT DETECTION ───
@@ -927,12 +927,15 @@ function calcLivePoints(mk, score){
     if((t.homeGoals-t.awayGoals)===actualDiff)pts+=3;
     // Eksakt stilling — live
     if(t.homeGoals===hg&&t.awayGoals===ag)pts+=3;
-    // Bonuser — bare når kampen er ferdig (FT), da vet vi fasit
-    if(isFinal){
-      if(t.firstScorer===actualFS)pts+=2;
-      if((t.redCard==='Y')===hasRedCard)pts+=2;
-      if((t.firstHalfGoal==='Y')===firstHalfGoal)pts+=2;
-    }
+    // First scorer: confirmed the moment the first goal goes in
+    if(firstGoal){ if(t.firstScorer===actualFS)pts+=2; }
+    else if(isFinal){ if(t.firstScorer==='N')pts+=2; }
+    // First-half goal: 'Ja' confirmed live; 'Nei' only confirmed at FT
+    if(firstHalfGoal){ if(t.firstHalfGoal==='Y')pts+=2; }
+    else if(isFinal){ if(t.firstHalfGoal==='N')pts+=2; }
+    // Red card: same logic — 'Ja' confirmed live, 'Nei' only at FT
+    if(hasRedCard){ if(t.redCard==='Y')pts+=2; }
+    else if(isFinal){ if(t.redCard==='N')pts+=2; }
     upd[`tips/${tid}/livePoints`]=pts;
     if(isFinal&&!t.resolved){
       // Add bonus points and mark resolved
