@@ -535,7 +535,9 @@ function renderAdminPlayers(){
 
   // ── Match management panel (uses dedicated container, no duplicates) ──
   const matchEntries=Object.entries(MATCHES);
-  const matchRows=matchEntries.map(([mk,m])=>`
+  const activeEntries=matchEntries.filter(([mk])=>liveScores[mk]?.status!=='FT');
+  const doneCount=matchEntries.length-activeEntries.length;
+  const matchRows=activeEntries.map(([mk,m])=>`
     <div class="player-row">
       <div style="flex:1">
         <div style="font-size:14px;font-weight:500">${teamFlag(m.home)}${getTeamAbbr(m.home)} vs ${teamFlag(m.away)}${getTeamAbbr(m.away)}</div>
@@ -543,9 +545,12 @@ function renderAdminPlayers(){
       </div>
       <button class="btn btn-sm btn-red" onclick="removeMatch('${mk}')">×</button>
     </div>`).join('');
+  const emptyMsg=matchEntries.length
+    ?`<div style="font-size:13px;color:var(--green);margin-bottom:8px">✅ Alle kamper ferdige</div>`
+    :`<div style="font-size:13px;color:var(--amber);margin-bottom:8px">⚠️ Ingen kamper lagt til ennå</div>`;
   document.getElementById('match-admin-panel').innerHTML=`<div class="card" style="margin-bottom:12px;border-color:var(--blue)">
-    <div class="card-label">⚽ Kamper</div>
-    ${matchEntries.length ? matchRows : '<div style="font-size:13px;color:var(--amber);margin-bottom:8px">⚠️ Ingen kamper lagt til ennå</div>'}
+    <div class="card-label">⚽ Kamper${doneCount?` <span style="font-size:10px;color:var(--text3);font-weight:400">(${doneCount} ferdig skjult)</span>`:''}</div>
+    ${activeEntries.length ? matchRows : emptyMsg}
     <button class="btn btn-sm" style="margin-top:8px;width:100%" onclick="document.getElementById('add-match-form').style.display=document.getElementById('add-match-form').style.display==='none'?'block':'none'">+ Legg til kamp</button>
     <div id="add-match-form" style="display:none;margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
       <select id="add-match-league" style="margin-bottom:8px;font-size:13px;width:100%">
@@ -1292,17 +1297,19 @@ function rebuildBetCatalogs(){
 }
 function renderMatchButtons(){
   const list=Object.entries(MATCHES);
-  const cols=Math.max(1,Math.min(list.length,3));
   ['tip-match-buttons','bet-match-buttons'].forEach(cid=>{
     const el=document.getElementById(cid); if(!el)return;
-    if(!list.length){
+    const isBet=cid.startsWith('bet');
+    // Betting: hide finished matches; Tipping: show all (locked form shows the result)
+    const display=isBet?list.filter(([mk])=>liveScores[mk]?.status!=='FT'):list;
+    if(!display.length){
       el.style.gridTemplateColumns='1fr';
-      el.innerHTML=`<div style="font-size:13px;color:var(--text3);padding:10px;text-align:center">Ingen kamper konfigurert — admin legger til kamper i <strong>Spillere</strong>-fanen</div>`;
+      el.innerHTML=`<div style="font-size:13px;color:var(--text3);padding:10px;text-align:center">${isBet?'Ingen aktive kamper for veddemål':'Ingen kamper konfigurert — admin legger til kamper i <strong>Spillere</strong>-fanen'}</div>`;
       return;
     }
-    const isBet=cid.startsWith('bet');
+    const cols=Math.max(1,Math.min(display.length,3));
     el.style.gridTemplateColumns=`repeat(${cols},1fr)`;
-    el.innerHTML=list.map(([mk,m])=>`<div class="hub-btn" id="${isBet?'bet-match-btn':'match-btn'}-${mk}" onclick="${isBet?'selectBetMatch':'selectTipMatch'}('${mk}')">${teamFlag(m.home)}${getTeamAbbr(m.home)} vs ${teamFlag(m.away)}${getTeamAbbr(m.away)}</div>`).join('');
+    el.innerHTML=display.map(([mk,m])=>`<div class="hub-btn" id="${isBet?'bet-match-btn':'match-btn'}-${mk}" onclick="${isBet?'selectBetMatch':'selectTipMatch'}('${mk}')">${teamFlag(m.home)}${getTeamAbbr(m.home)} vs ${teamFlag(m.away)}${getTeamAbbr(m.away)}</div>`).join('');
     const sel=isBet?selectedBetMatch:selectedTipMatch;
     if(sel)document.getElementById((isBet?'bet-match-btn':'match-btn')+'-'+sel)?.classList.add('selected');
   });
@@ -1709,6 +1716,7 @@ document.addEventListener('input', e=>{ if(e.target.id==='bet-stake') updatePayo
 
 window.confirmBet = function(){
   if(!pendingBet)return;
+  if(liveScores[pendingBet.matchKey]?.status==='FT'){ showToast('Kampen er ferdig – ingen nye bets! ✅'); cancelBet(); return; }
   const pid = document.getElementById('bet-placer-sel').value;
   const stake = parseInt(document.getElementById('bet-stake').value)||0;
   if(!pid){ showToast('Velg spiller!'); return; }
