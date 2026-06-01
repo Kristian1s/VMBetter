@@ -417,7 +417,7 @@ let players={}, bets={}, tips={};
 let selectedBettors=new Set();
 let currentTab='spillere';
 let liveScores={};
-let tipForm={ hub:null, homeGoals:'', awayGoals:'', firstScorer:null, redCard:null, firstHalfGoal:null };
+let tipForm={ hub:null, homeGoals:'', awayGoals:'', firstScorer:null, firstHalfGoal:null, overUnder:null, bothScore:null };
 let toastTimer;
 let selectedTipMatch='';
 let selectedBetMatch='';
@@ -655,7 +655,7 @@ function renderMyOverview(){
           <span style="color:var(--amber);font-weight:600">${pts}p${isLive?' 🔴':''}</span>
         </div>
         <div style="font-size:14px">${t.hub} · ${t.homeGoals}–${t.awayGoals}</div>
-        <div style="font-size:12px;color:var(--text2);margin-top:2px">Scorer: ${t.firstScorer==='H'?match?.home||'H':t.firstScorer==='A'?match?.away||'A':'Ingen'} · Rødt: ${t.redCard==='Y'?'Ja':'Nei'} · 1.omg: ${t.firstHalfGoal==='Y'?'Ja':'Nei'}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px">⚽ ${t.firstScorer==='H'?match?.home||'H':t.firstScorer==='A'?match?.away||'A':'–'} · ⏱️ ${t.firstHalfGoal==='Y'?'Ja':'Nei'} · 📊 ${t.overUnder==='O'?'Over':'Under'} · 🎯 ${t.bothScore==='Y'?'Ja':'Nei'}</div>
       </div>`;
     });
     html+=`</div>`;
@@ -761,7 +761,10 @@ async function fetchSofaScore(sofaId){
 async function fetchESPN(league, eventId){
   if(!league||!eventId)return null;
   try{
-    const res=await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${league}/summary?event=${eventId}`);
+    const ctrl=new AbortController();
+    const tId=setTimeout(()=>ctrl.abort(),8000);
+    const res=await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${league}/summary?event=${eventId}`,{signal:ctrl.signal});
+    clearTimeout(tId);
     if(!res.ok)return null;
     const d=await res.json();
     const comp=d.header?.competitions?.[0]; if(!comp)return null;
@@ -885,19 +888,21 @@ function showEventBanner(ev, mk){
 async function refreshLive(){
   for(const[key,match]of Object.entries(MATCHES)){
     if(liveScores[key]?.status==='FT')continue;
-    let s=null;
-    if(match.espnId)s=await fetchESPN(match.espnLeague,match.espnId);
-    if(!s&&match.sofaId)s=await fetchSofaScore(match.sofaId);
-    if(!s&&match.fixtureId)s=await fetchLive(match.fixtureId);
-    if(s){
-      const newEvs=checkNewEvents(key,s.events||[]);
-      liveScores[key]=s; syncClock(key,s);
-      calcLivePoints(key,s); autoResolveBets(key,s);
-      newEvs.forEach(ev=>showEventBanner(ev,key));
-      document.getElementById('sync-label').textContent=`Live ✓ ${new Date().toLocaleTimeString('no',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}`;
-      document.getElementById('sync-dot').className='dot live';
-      if(currentTab==='betting')renderBetCatalog();
-    }
+    try{
+      let s=null;
+      if(match.espnId)s=await fetchESPN(match.espnLeague,match.espnId);
+      if(!s&&match.sofaId)s=await fetchSofaScore(match.sofaId);
+      if(!s&&match.fixtureId)s=await fetchLive(match.fixtureId);
+      if(s){
+        const newEvs=checkNewEvents(key,s.events||[]);
+        liveScores[key]=s; syncClock(key,s);
+        calcLivePoints(key,s); autoResolveBets(key,s);
+        newEvs.forEach(ev=>showEventBanner(ev,key));
+        document.getElementById('sync-label').textContent=`Live ✓ ${new Date().toLocaleTimeString('no',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}`;
+        document.getElementById('sync-dot').className='dot live';
+        if(currentTab==='betting')renderBetCatalog();
+      }
+    }catch(e){ /* skip this match, retry next interval */ }
   }
   renderLiveBox();
   if(currentTab==='tv')renderTVLive();
@@ -915,46 +920,58 @@ function calcLivePoints(mk, score){
   if(hg===null||ag===null)return;
 
   const events=score.events||[];
+  const totalGoals=hg+ag;
+
+  // First scorer — from goal events
   const firstGoal=events.find(e=>e.type==='Goal');
-  const hasRedCard=events.some(e=>e.type==='Card'&&e.detail==='Red Card');
-  const firstHalfGoal=events.some(e=>e.type==='Goal'&&e.time?.elapsed<=45);
-  let actualFS='N';
+  let actualFS=null; // null = no goal yet
   if(firstGoal){
     const homeTeam=MATCHES[mk]?.home||'';
     actualFS=firstGoal.team.name.toLowerCase().includes(homeTeam.toLowerCase().split(' ')[0])?'H':'A';
   }
+
+  // First half goal — halftime score preferred, fall back to events
+  let firstHalfGoal=false;
+  if(score.halftime&&typeof score.halftime.home==='number'){
+    firstHalfGoal=(score.halftime.home+score.halftime.away)>0;
+  } else {
+    firstHalfGoal=events.some(e=>e.type==='Goal'&&e.time?.elapsed<=45);
+  }
+
+  const isOver=totalGoals>=3;       // over 2.5 = 3+ goals
+  const bothScored=hg>0&&ag>0;
   const actualHub=hg>ag?'H':hg<ag?'B':'U';
   const actualDiff=hg-ag;
 
   const upd={};
   for(const[tid,t]of matchTips){
-    let pts=0;
-    // HUB — live
-    if(t.hub===actualHub)pts+=3;
-    // Målforskjell — live
-    if((t.homeGoals-t.awayGoals)===actualDiff)pts+=3;
-    // Eksakt stilling — live
-    if(t.homeGoals===hg&&t.awayGoals===ag)pts+=3;
-    // First scorer: confirmed the moment the first goal goes in
-    if(firstGoal){ if(t.firstScorer===actualFS)pts+=2; }
-    else if(isFinal){ if(t.firstScorer==='N')pts+=2; }
-    // First-half goal: 'Ja' confirmed live; 'Nei' only confirmed at FT
-    if(firstHalfGoal){ if(t.firstHalfGoal==='Y')pts+=2; }
-    else if(isFinal){ if(t.firstHalfGoal==='N')pts+=2; }
-    // Red card: same logic — 'Ja' confirmed live, 'Nei' only at FT
-    if(hasRedCard){ if(t.redCard==='Y')pts+=2; }
-    else if(isFinal){ if(t.redCard==='N')pts+=2; }
+    // Ladder: only highest achieved level gives points
+    const exactHit=t.homeGoals===hg&&t.awayGoals===ag;
+    const diffHit=!exactHit&&(t.homeGoals-t.awayGoals)===actualDiff;
+    const hubHit=!diffHit&&!exactHit&&t.hub===actualHub;
+    let pts=exactHit?7:diffHit?5:hubHit?3:0;
+
+    // Bonus: first scorer (1p) — 0-0 at FT = no points for anyone
+    if(actualFS!==null){ if(t.firstScorer===actualFS)pts+=1; }
+    // (if actualFS===null at FT it's 0-0 → no points, intentional)
+
+    // Bonus: first half goal (1p) — 'Y' confirmed live, 'N' only at FT
+    if(firstHalfGoal){ if(t.firstHalfGoal==='Y')pts+=1; }
+    else if(isFinal){ if(t.firstHalfGoal==='N')pts+=1; }
+
+    // Bonus: over/under 2.5 (1p) — 'O' confirmed live at 3+ goals, 'U' only at FT
+    if(isOver){ if(t.overUnder==='O')pts+=1; }
+    else if(isFinal){ if(t.overUnder==='U')pts+=1; }
+
+    // Bonus: both teams score (1p) — 'Y' confirmed live, 'N' only at FT
+    if(bothScored){ if(t.bothScore==='Y')pts+=1; }
+    else if(isFinal){ if(t.bothScore==='N')pts+=1; }
+
     upd[`tips/${tid}/livePoints`]=pts;
     if(isFinal&&!t.resolved){
-      // Add bonus points and mark resolved
-      let bonusPts=0;
-      if(t.firstScorer===actualFS)bonusPts+=2;
-      if((t.redCard==='Y')===hasRedCard)bonusPts+=2;
-      if((t.firstHalfGoal==='Y')===firstHalfGoal)bonusPts+=2;
-      const finalPts=pts; // already includes bonus above
-      upd[`tips/${tid}/points`]=finalPts;
+      upd[`tips/${tid}/points`]=pts;
       upd[`tips/${tid}/resolved`]=true;
-      upd[`players/${t.playerId}/tipPoints`]=(players[t.playerId]?.tipPoints||0)+finalPts-(t.livePoints||0);
+      upd[`players/${t.playerId}/tipPoints`]=(players[t.playerId]?.tipPoints||0)+pts-(t.livePoints||0);
     }
   }
   if(Object.keys(upd).length) update(ref(db),upd);
@@ -1000,8 +1017,7 @@ function showKickoffLock(mk,score,el){
 }
 function showLockedTip(mk,t,el){
   const match=MATCHES[mk];
-  const hubLabel=t.hub==='H'?match?.home:t.hub==='B'?match?.away:'Uavgjort';
-  const scorerLabel=t.firstScorer==='H'?match?.home:t.firstScorer==='A'?match?.away:'Ingen mål';
+  const scorerLabel=t.firstScorer==='H'?match?.home:t.firstScorer==='A'?match?.away:'–';
   el.innerHTML=`<div class="card" style="border-color:var(--green)">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
       <span style="font-size:20px">🔒</span>
@@ -1011,8 +1027,9 @@ function showLockedTip(mk,t,el){
       <div style="font-size:18px;font-weight:600;margin-bottom:6px">${match?.home} ${t.homeGoals}–${t.awayGoals} ${match?.away} <span style="font-size:14px;color:var(--text2)">(${t.hub})</span></div>
       <div style="font-size:13px;color:var(--text2);display:flex;flex-direction:column;gap:3px">
         <span>⚽ Første scorer: <strong style="color:var(--text)">${scorerLabel}</strong></span>
-        <span>🟥 Rødt kort: <strong style="color:var(--text)">${t.redCard==='Y'?'Ja':'Nei'}</strong></span>
         <span>⏱️ Mål 1. omgang: <strong style="color:var(--text)">${t.firstHalfGoal==='Y'?'Ja':'Nei'}</strong></span>
+        <span>📊 Over/under 2,5: <strong style="color:var(--text)">${t.overUnder==='O'?'Over':'Under'}</strong></span>
+        <span>🎯 Begge scorer: <strong style="color:var(--text)">${t.bothScore==='Y'?'Ja':'Nei'}</strong></span>
       </div>
     </div>
     <div style="font-size:12px;color:var(--text3);margin-top:8px;text-align:center">Be admin om å slette tipset hvis noe er galt</div>
@@ -1133,16 +1150,16 @@ window.renderTipForm=function(){
     if(existing){ showLockedTip(mk,existing,el); return; }
   }
   const match=MATCHES[mk];
-  tipForm={hub:null,homeGoals:'',awayGoals:'',firstScorer:null,redCard:null,firstHalfGoal:null};
+  tipForm={hub:null,homeGoals:'',awayGoals:'',firstScorer:null,firstHalfGoal:null,overUnder:null,bothScore:null};
   el.innerHTML=`
-    <div class="card"><div class="card-label">Utfall — 3 poeng</div>
+    <div class="card"><div class="card-label">Utfall — opptil 7 poeng</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:8px">Riktig HUB: 3p · Riktig målforskjell: 5p · Eksakt stilling: 7p</div>
       <div class="hub-row">
         <div class="hub-btn" id="hub-H" onclick="selHub('H')">H<br><small style="font-size:11px;color:var(--text2)">${match.home}</small></div>
         <div class="hub-btn" id="hub-U" onclick="selHub('U')">U<br><small style="font-size:11px;color:var(--text2)">Uavgjort</small></div>
         <div class="hub-btn" id="hub-B" onclick="selHub('B')">B<br><small style="font-size:11px;color:var(--text2)">${match.away}</small></div>
       </div></div>
-    <div class="card"><div class="card-label">Stilling — maks 6 poeng</div>
-      <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Rett målforskjell +3p · Eksakt stilling +3p ekstra</div>
+    <div class="card"><div class="card-label">Stilling</div>
       <div class="score-inp-row">
         <div id="drum-hg-wrap"></div>
         <input type="hidden" id="tip-hg" value="0">
@@ -1151,22 +1168,28 @@ window.renderTipForm=function(){
         <input type="hidden" id="tip-ag" value="0">
       </div>
       <div style="text-align:center;font-size:12px;color:var(--text2)">${match.home} – ${match.away}</div></div>
-    <div class="card"><div class="card-label">Bonusspørsmål — 2 poeng hver</div>
-      <div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:6px">⚽ Første lag som scorer</div>
+    <div class="card"><div class="card-label">Bonusspørsmål — 1 poeng hver</div>
+      <div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:4px">⚽ Første lag som scorer</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:8px">0–0 gir ingen poeng her</div>
       <div style="margin-bottom:12px">
         <span class="bonus-opt" id="fs-H" onclick="selBonus('firstScorer','H',this)">${match.home}</span>
         <span class="bonus-opt" id="fs-A" onclick="selBonus('firstScorer','A',this)">${match.away}</span>
-        <span class="bonus-opt" id="fs-N" onclick="selBonus('firstScorer','N',this)">Ingen mål</span>
-      </div>
-      <div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:6px">🔴 Rødt kort?</div>
-      <div style="margin-bottom:12px">
-        <span class="bonus-opt" id="rc-Y" onclick="selBonus('redCard','Y',this)">Ja</span>
-        <span class="bonus-opt" id="rc-N" onclick="selBonus('redCard','N',this)">Nei</span>
       </div>
       <div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:6px">⏱️ Mål i 1. omgang?</div>
-      <div>
+      <div style="margin-bottom:12px">
         <span class="bonus-opt" id="fhg-Y" onclick="selBonus('firstHalfGoal','Y',this)">Ja</span>
         <span class="bonus-opt" id="fhg-N" onclick="selBonus('firstHalfGoal','N',this)">Nei</span>
+      </div>
+      <div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:4px">📊 Over/under 2,5 mål?</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:8px">Over = 3 eller flere totale mål</div>
+      <div style="margin-bottom:12px">
+        <span class="bonus-opt" id="ou-O" onclick="selBonus('overUnder','O',this)">Over</span>
+        <span class="bonus-opt" id="ou-U" onclick="selBonus('overUnder','U',this)">Under</span>
+      </div>
+      <div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:6px">🎯 Begge lag scorer?</div>
+      <div>
+        <span class="bonus-opt" id="bs-Y" onclick="selBonus('bothScore','Y',this)">Ja</span>
+        <span class="bonus-opt" id="bs-N" onclick="selBonus('bothScore','N',this)">Nei</span>
       </div></div>
     <button class="btn btn-primary btn-full" onclick="submitTip('${mk}')">Send inn tipp 🎯</button>
     <div id="tip-status" style="margin-top:10px"></div>`;
@@ -1174,7 +1197,7 @@ window.renderTipForm=function(){
   document.getElementById('drum-ag-wrap')?.appendChild(makeDrumPicker('tip-ag'));
 };
 window.selHub=function(v){ tipForm.hub=v; ['H','U','B'].forEach(x=>document.getElementById('hub-'+x)?.classList.toggle('selected',x===v)); };
-window.selBonus=function(field,val,el){ tipForm[field]=val; const pfx={firstScorer:'fs',redCard:'rc',firstHalfGoal:'fhg'}[field]; document.querySelectorAll(`[id^="${pfx}-"]`).forEach(e=>e.classList.remove('selected')); el.classList.add('selected'); };
+window.selBonus=function(field,val,el){ tipForm[field]=val; const pfx={firstScorer:'fs',firstHalfGoal:'fhg',overUnder:'ou',bothScore:'bs'}[field]; document.querySelectorAll(`[id^="${pfx}-"]`).forEach(e=>e.classList.remove('selected')); el.classList.add('selected'); };
 window.submitTip=function(mk){
   if(liveScores[mk]&&liveScores[mk].status!=='NS'){ showToast('Kampen har startet – tipping stengt! 🔒'); return; }
   const pid=document.getElementById('tip-player-select').value;
@@ -1183,11 +1206,12 @@ window.submitTip=function(mk){
   if(!pid){ showToast('Velg spiller!'); return; }
   if(!tipForm.hub){ showToast('Velg utfall!'); return; }
   if(hgVal===''||hgVal===null||hgVal===undefined||agVal===''||agVal===null||agVal===undefined){ showToast('Fyll inn stilling!'); return; }
-  if(!tipForm.firstScorer||!tipForm.redCard||!tipForm.firstHalfGoal){ showToast('Svar på alle bonus!'); return; }
+  if(!tipForm.firstScorer||!tipForm.firstHalfGoal||!tipForm.overUnder||!tipForm.bothScore){ showToast('Svar på alle bonusspørsmål!'); return; }
   const existing=Object.keys(tips).find(k=>tips[k].playerId===pid&&tips[k].matchKey===mk);
   const data={ playerId:pid, playerName:players[pid]?.name||'', matchKey:mk, matchLabel:MATCHES[mk]?.label||mk,
     hub:tipForm.hub, homeGoals:parseInt(hgVal), awayGoals:parseInt(agVal),
-    firstScorer:tipForm.firstScorer, redCard:tipForm.redCard, firstHalfGoal:tipForm.firstHalfGoal,
+    firstScorer:tipForm.firstScorer, firstHalfGoal:tipForm.firstHalfGoal,
+    overUnder:tipForm.overUnder, bothScore:tipForm.bothScore,
     points:null, resolved:false, createdAt:Date.now() };
   if(existing){ showToast('Du har allerede tippet på denne kampen! 🔒'); return; }
   push(ref(db,'tips'),data); saveDeviceMapping(pid); showToast('Tipp registrert! 🎯');
@@ -1842,34 +1866,46 @@ window.showBreakdown=function(playerId){
       <div style="font-size:13px;color:var(--text2);margin-bottom:8px">Tippet: ${MATCHES[mk]?.home||'H'} ${t.homeGoals}–${t.awayGoals} ${MATCHES[mk]?.away||'A'} (${t.hub})</div>`;
 
     if(hg!==null){
-      const actualHub=hg>ag?'H':hg<ag?'B':'U';
-      const hubHit=t.hub===actualHub;
-      const diffHit=(t.homeGoals-t.awayGoals)===(hg-ag);
       const exactHit=t.homeGoals===hg&&t.awayGoals===ag;
-      rows+=breakdown('Rett utfall (HUB)', hubHit?3:0, 3, hubHit);
-      rows+=breakdown('Rett målforskjell', diffHit?3:0, 3, diffHit);
-      rows+=breakdown('Eksakt stilling', exactHit?3:0, 3, exactHit);
+      const diffHit=!exactHit&&(t.homeGoals-t.awayGoals)===(hg-ag);
+      const hubHit=!diffHit&&!exactHit&&(hg>ag?'H':hg<ag?'B':'U')===t.hub;
+      const mainPts=exactHit?7:diffHit?5:hubHit?3:0;
+      const mainLabel=exactHit?'Eksakt stilling':diffHit?'Riktig målforskjell':hubHit?'Riktig HUB':'Ingen treff';
+      rows+=breakdown(mainLabel, mainPts, 7, mainPts>0?true:(isLive||isFT)?false:null);
     } else {
-      rows+=breakdown('Rett utfall (HUB)', '?', 3, null);
-      rows+=breakdown('Rett målforskjell', '?', 3, null);
-      rows+=breakdown('Eksakt stilling', '?', 3, null);
+      rows+=breakdown('Stilling', '?', 7, null);
     }
 
-    if(isFT&&score){
-      const events=score.events||[];
-      const firstGoal=events.find(e=>e.type==='Goal');
-      const hasRed=events.some(e=>e.type==='Card'&&e.detail==='Red Card');
-      const fhg=events.some(e=>e.type==='Goal'&&e.time?.elapsed<=45);
-      let actualFS='N';
-      if(firstGoal){ const home=MATCHES[mk]?.home||''; actualFS=firstGoal.team.name.toLowerCase().includes(home.toLowerCase().split(' ')[0])?'H':'A'; }
-      rows+=breakdown('Første scorer', (t.firstScorer===actualFS)?2:0, 2, t.firstScorer===actualFS);
-      rows+=breakdown('Rødt kort', ((t.redCard==='Y')===hasRed)?2:0, 2, (t.redCard==='Y')===hasRed);
-      rows+=breakdown('Mål i 1. omgang', ((t.firstHalfGoal==='Y')===fhg)?2:0, 2, (t.firstHalfGoal==='Y')===fhg);
-    } else {
-      rows+=breakdown('Første scorer', '?', 2, null);
-      rows+=breakdown('Rødt kort', '?', 2, null);
-      rows+=breakdown('Mål i 1. omgang', '?', 2, null);
-    }
+    // Bonus questions
+    const evs=score?.events||[];
+    const firstGoal=evs.find(e=>e.type==='Goal');
+    let actualFS=null;
+    if(firstGoal){ const home=MATCHES[mk]?.home||''; actualFS=firstGoal.team.name.toLowerCase().includes(home.toLowerCase().split(' ')[0])?'H':'A'; }
+    let fhg=false;
+    if(score?.halftime&&typeof score.halftime.home==='number'){ fhg=(score.halftime.home+score.halftime.away)>0; }
+    else{ fhg=evs.some(e=>e.type==='Goal'&&e.time?.elapsed<=45); }
+    const totalGoals=hg!==null?hg+ag:null;
+    const isOver=totalGoals!==null?totalGoals>=3:null;
+    const bothScored=hg!==null?hg>0&&ag>0:null;
+
+    // Scorer
+    if(actualFS!==null){ rows+=breakdown('⚽ Første scorer', t.firstScorer===actualFS?1:0, 1, t.firstScorer===actualFS); }
+    else if(isFT){ rows+=breakdown('⚽ Første scorer (0–0)', 0, 1, false); }
+    else{ rows+=breakdown('⚽ Første scorer', '?', 1, null); }
+
+    // First half goal
+    if(fhg||isFT){ const hit=(t.firstHalfGoal==='Y')===fhg; rows+=breakdown('⏱️ Mål i 1. omgang', hit?1:0, 1, hit); }
+    else{ rows+=breakdown('⏱️ Mål i 1. omgang', '?', 1, null); }
+
+    // Over/under
+    if(isOver===true){ rows+=breakdown('📊 Over 2,5 mål', t.overUnder==='O'?1:0, 1, t.overUnder==='O'); }
+    else if(isFT){ const hit=t.overUnder==='U'; rows+=breakdown('📊 Under 2,5 mål', hit?1:0, 1, hit); }
+    else{ rows+=breakdown('📊 Over/under 2,5', '?', 1, null); }
+
+    // Both score
+    if(bothScored===true){ rows+=breakdown('🎯 Begge lag scorer', t.bothScore==='Y'?1:0, 1, t.bothScore==='Y'); }
+    else if(isFT){ const hit=t.bothScore==='N'; rows+=breakdown('🎯 Begge lag scorer', hit?1:0, 1, hit); }
+    else{ rows+=breakdown('🎯 Begge lag scorer', '?', 1, null); }
 
     rows+=`<div class="breakdown-row" style="margin-top:4px;border-top:1px solid var(--border2);padding-top:8px">
       <span style="font-size:14px;font-weight:600;color:var(--text)">Tipping totalt</span>
@@ -2030,15 +2066,17 @@ function renderTVTips(){
     const actualHub=hasScore?(score.homeGoals>score.awayGoals?'H':score.homeGoals<score.awayGoals?'B':'U'):null;
     const actualDiff=hasScore?score.homeGoals-score.awayGoals:null;
 
-    // Bonus ground truth — only meaningful at FT
-    let actualFS=null, actualRC=null, actualFHG=null;
-    if(isFT && hasScore){
+    // Bonus ground truth — computed live where possible
+    let actualFS=null, actualFHG=null, actualOver=null, actualBoth=null;
+    if(hasScore){
       const evs=score.events||[];
       const firstGoal=evs.find(e=>e.type==='Goal');
-      actualRC=evs.some(e=>e.type==='Card'&&e.detail==='Red Card');
-      actualFHG=evs.some(e=>e.type==='Goal'&&e.time?.elapsed<=45);
-      actualFS='N';
       if(firstGoal){ const home=match.home||''; actualFS=firstGoal.team.name.toLowerCase().includes(home.toLowerCase().split(' ')[0])?'H':'A'; }
+      if(score.halftime&&typeof score.halftime.home==='number'){ actualFHG=(score.halftime.home+score.halftime.away)>0; }
+      else{ actualFHG=evs.some(e=>e.type==='Goal'&&e.time?.elapsed<=45); }
+      const tot=(score.homeGoals||0)+(score.awayGoals||0);
+      actualOver=tot>=3;
+      actualBoth=(score.homeGoals||0)>0&&(score.awayGoals||0)>0;
     }
 
     const playerList=getSorted();
@@ -2054,13 +2092,14 @@ function renderTVTips(){
       const exactHit=hasScore?tip.homeGoals===score.homeGoals&&tip.awayGoals===score.awayGoals:null;
       const ind=h=>h===null?'<span style="font-size:12px;color:var(--text3)">·</span>':h?'<span style="font-size:12px">✅</span>':'<span style="font-size:12px">❌</span>';
 
-      const fsHit=actualFS!==null?tip.firstScorer===actualFS:null;
-      const rcHit=actualRC!==null?(tip.redCard==='Y')===actualRC:null;
-      const fhgHit=actualFHG!==null?(tip.firstHalfGoal==='Y')===actualFHG:null;
+      const fsHit=actualFS!==null?tip.firstScorer===actualFS:(isFT?false:null);
+      const fhgHit=actualFHG===null?null:actualFHG?(tip.firstHalfGoal==='Y'):(isFT?tip.firstHalfGoal==='N':null);
+      const ouHit=actualOver===null?null:actualOver?(tip.overUnder==='O'):(isFT?tip.overUnder==='U':null);
+      const bothHit=actualBoth===null?null:actualBoth?(tip.bothScore==='Y'):(isFT?tip.bothScore==='N':null);
       const bonusInd=h=>h===null?'':h?' ✅':' ❌';
       const bonusCol=h=>h===true?'var(--green)':h===false?'var(--red)':'var(--text)';
 
-      const scorerLabel=tip.firstScorer==='H'?getTeamAbbr(match.home):tip.firstScorer==='A'?getTeamAbbr(match.away):'Ingen';
+      const scorerLabel=tip.firstScorer==='H'?getTeamAbbr(match.home):tip.firstScorer==='A'?getTeamAbbr(match.away):'–';
       const ptsColor=pts>0?'var(--green)':pts===0&&(isLive||isFT)?'var(--red)':'var(--text3)';
 
       return`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
@@ -2073,10 +2112,11 @@ function renderTVTips(){
           </div>
         </div>
         <div style="display:flex;gap:2px;align-items:center;flex-shrink:0">${ind(hubHit)}${ind(diffHit)}${ind(exactHit)}</div>
-        <div style="flex:1;display:flex;gap:12px;align-items:center;justify-content:center;font-size:12px;color:var(--text2)">
+        <div style="flex:1;display:flex;gap:10px;align-items:center;justify-content:center;font-size:12px;color:var(--text2);flex-wrap:wrap">
           <span>⚽ <strong style="color:${bonusCol(fsHit)}">${scorerLabel}</strong>${bonusInd(fsHit)}</span>
-          <span>🟥 <strong style="color:${bonusCol(rcHit)}">${tip.redCard==='Y'?'Ja':'Nei'}</strong>${bonusInd(rcHit)}</span>
           <span>⏱️ <strong style="color:${bonusCol(fhgHit)}">${tip.firstHalfGoal==='Y'?'Ja':'Nei'}</strong>${bonusInd(fhgHit)}</span>
+          <span>📊 <strong style="color:${bonusCol(ouHit)}">${tip.overUnder==='O'?'Over':'Under'}</strong>${bonusInd(ouHit)}</span>
+          <span>🎯 <strong style="color:${bonusCol(bothHit)}">${tip.bothScore==='Y'?'Ja':'Nei'}</strong>${bonusInd(bothHit)}</span>
         </div>
         <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;min-width:36px;text-align:right;color:${ptsColor}">${pts}p</div>
       </div>`;
