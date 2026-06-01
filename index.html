@@ -385,7 +385,7 @@ select option{background:var(--bg3)}
 
     <!-- COL 1 BOTTOM: Tippekonk predictions -->
     <div class="tv-card tv-col-scroll" id="tv-tips-card" style="grid-column:1;grid-row:2">
-      <div class="tv-title">🏆 TIPPEKONK</div>
+      <div class="tv-title">📊 RANGERING</div>
       <div id="tv-tips"></div>
     </div>
 
@@ -2282,131 +2282,105 @@ function getParlayLegStatus(leg){
   return r===true?'won':r===false?'lost':'pending';
 }
 
+function getTokenBalance(pid){ return TOKEN_BUDGET - getTokensSpent(pid) + getTokensWon(pid); }
+
 function renderTVBets(){
   const el=document.getElementById('tv-bets-right-content'); if(!el)return;
-  const playerOrder=getSorted().map(([id])=>id);
-  const byPlayer={};
-  Object.entries(bets).forEach(([,b])=>{
-    if(b.status==='lost')return;
-    if(!byPlayer[b.placerId])byPlayer[b.placerId]={name:b.placerName,bets:[]};
-    byPlayer[b.placerId].bets.push(b);
+
+  // Token leaderboard — all players sorted by balance
+  const balList=Object.entries(players)
+    .map(([id,p])=>[id,p,getTokenBalance(id)])
+    .sort((a,b)=>b[2]-a[2]);
+
+  // Hot bets — group single bets by betId, sorted by total stake
+  const groups={};
+  Object.values(bets).forEach(b=>{
+    if(b.isParlay)return;
+    const k=b.betId;
+    if(!groups[k])groups[k]={desc:b.desc,players:0,stake:0,status:'open'};
+    groups[k].players++;
+    groups[k].stake+=(b.stake||0);
+    if(b.status==='won')groups[k].status='won';
+    else if(b.status==='lost'&&groups[k].status!=='won')groups[k].status='lost';
   });
-  const sorted=playerOrder.filter(id=>byPlayer[id]);
-  if(!sorted.length){ el.innerHTML='<div style="color:var(--text3);font-size:13px">Ingen bets ennå</div>'; return; }
-  el.innerHTML=sorted.map(pid=>{
-    const grp=byPlayer[pid]; if(!grp)return'';
-    const p=players[pid];
-    return`<div class="tv-bet-player">
-      <div class="tv-bet-player-name">${avatarEl(p,pid)} ${grp.name}</div>
-      ${grp.bets.map(b=>{
-        const won=b.status==='won';
-        const legRows=b.isParlay&&b.legs
-          ?b.legs.map(l=>{
-              const st=getParlayLegStatus(l);
-              const col=st==='won'?'var(--green)':st==='lost'?'var(--red)':'var(--text3)';
-              const icon=st==='won'?'✅':st==='lost'?'❌':'⏳';
-              return`<div style="font-size:11px;color:${col};margin-bottom:2px">${icon} ${l.desc} <span style="color:var(--text3)">(${l.odds}×)</span></div>`;
-            }).join('')
-          :'';
-        return`<div class="tv-bet-row${won?' won':''}">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
-            <span style="font-size:10px;color:var(--text2)">${b.isParlay?'🔗 Parlay':b.matchLabel||''}</span>
-            <span style="font-size:12px;font-weight:700;color:${won?'var(--green)':'var(--amber)'}">${b.odds}×${won?' 🎉':''}</span>
+  const hotBets=Object.values(groups).sort((a,b)=>b.stake-a.stake);
+
+  function miniAvatar(p){
+    return p?.avatar?.startsWith('data:')
+      ?`<img src="${p.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
+      :`<span style="font-size:10px;font-weight:700">${p?.name?.charAt(0).toUpperCase()||'?'}</span>`;
+  }
+
+  el.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 14px">
+    <div>
+      <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border)">Token-saldo</div>
+      ${balList.map(([id,p,bal],i)=>{
+        const profit=bal-TOKEN_BUDGET;
+        const profCol=profit>0?'var(--green)':profit<0?'var(--red)':'var(--text3)';
+        const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
+        return`<div style="display:flex;align-items:center;gap:5px;padding:4px 0;border-bottom:1px solid var(--border)">
+          <span style="font-size:12px;width:18px;text-align:center">${medal||(i+1)}</span>
+          <div style="width:22px;height:22px;border-radius:50%;background:var(--bg4);flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden">${miniAvatar(p)}</div>
+          <div style="flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</div>
+          <div style="text-align:right;flex-shrink:0">
+            <span style="font-family:'Bebas Neue',sans-serif;font-size:17px;letter-spacing:.5px">${bal}</span>
+            <span style="font-size:10px;color:${profCol};margin-left:3px">${profit>0?'+':''}${profit}</span>
           </div>
-          ${legRows||`<div style="font-size:12px;font-weight:500;margin-bottom:2px">${b.desc}</div>`}
-          <div style="font-size:11px;color:var(--text2)">🎯${b.stake} → 🏆${b.payout}${won?` <strong style="color:var(--green)">TREFF!</strong>`:''}</div>
         </div>`;
       }).join('')}
-    </div>`;
-  }).join('');
+    </div>
+    <div>
+      <div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border)">Populære bets</div>
+      ${hotBets.length?hotBets.map(g=>{
+        const won=g.status==='won', lost=g.status==='lost';
+        const accentCol=won?'var(--green)':lost?'var(--red)':'var(--amber)';
+        return`<div style="padding:5px 0 5px 8px;border-bottom:1px solid var(--border);border-left:2px solid ${accentCol};margin-bottom:2px">
+          <div style="font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${g.desc}</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:1px">${g.players} spiller${g.players!==1?'e':''} · <strong style="color:${accentCol}">${g.stake}T</strong>${won?' ✅':lost?' ❌':''}</div>
+        </div>`;
+      }).join(''):`<div style="font-size:12px;color:var(--text3);padding-top:4px">Ingen bets ennå</div>`}
+    </div>
+  </div>`;
 }
 
 function renderTVTips(){
   const el=document.getElementById('tv-tips'); if(!el)return;
-  const matchKeys=Object.keys(MATCHES);
-  if(!matchKeys.length){ el.innerHTML='<div style="color:var(--text3);font-size:13px">Ingen kamper lagt til</div>'; return; }
+  // Positions 4+ (top 3 shown in podium)
+  const sorted=getSorted();
+  const rest=sorted.slice(3);
+  if(!rest.length){ el.innerHTML='<div style="color:var(--text3);font-size:12px;padding-top:4px">Kun 3 spillere</div>'; return; }
 
-  el.innerHTML=matchKeys.map((mk,mi)=>{
-    const match=MATCHES[mk];
-    const score=liveScores[mk];
-    const isLive=score&&['1H','HT','2H','ET','P'].includes(score.status);
-    const isFT=score&&score.status==='FT';
-    const hasScore=score&&score.status!=='NS'&&typeof score.homeGoals==='number';
-    const actualHub=hasScore?(score.homeGoals>score.awayGoals?'H':score.homeGoals<score.awayGoals?'B':'U'):null;
-    const actualDiff=hasScore?score.homeGoals-score.awayGoals:null;
+  function miniAvatar(p){
+    return p?.avatar?.startsWith('data:')
+      ?`<img src="${p.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
+      :`<span style="font-size:10px;font-weight:700">${p?.name?.charAt(0).toUpperCase()||'?'}</span>`;
+  }
 
-    // Bonus ground truth — computed live where possible
-    let actualFS=null, actualFHG=null;
-    const playerActuals={};
-    if(hasScore){
-      const evs=score.events||[];
-      const firstGoal=evs.find(e=>e.type==='Goal');
-      if(firstGoal){ const home=match.home||''; actualFS=firstGoal.team.name.toLowerCase().includes(home.toLowerCase().split(' ')[0])?'H':'A'; }
-      if(score.halftime&&typeof score.halftime.home==='number'){ actualFHG=(score.halftime.home+score.halftime.away)>0; }
-      else{ actualFHG=evs.some(e=>e.type==='Goal'&&e.time?.elapsed<=45); }
-      const goals=goalEvents(evs);
-      (MATCH_PLAYER_BETS[mk]||[]).forEach(pb=>{
-        playerActuals[pb.field]=goals.some(e=>pb.names.some(n=>e.player?.name?.toLowerCase().includes(n)));
-      });
-    }
+  // Two-column grid — left column: odd ranks, right column: even ranks
+  const left=rest.filter((_,i)=>i%2===0);
+  const right=rest.filter((_,i)=>i%2===1);
+  const maxRows=Math.max(left.length,right.length);
 
-    const playerList=getSorted();
-    const rows=playerList.map(([pid,p])=>{
-      const tip=Object.values(tips).find(t=>t.playerId===pid&&t.matchKey===mk);
-      if(!tip) return '';
-
-      const pts=getTipPoints(tip);
-      const hubAbbr=tip.hub==='H'?getTeamAbbr(match.home):tip.hub==='B'?getTeamAbbr(match.away):'U';
-      const hubColor=tip.hub==='H'?'var(--blue)':tip.hub==='B'?'var(--amber)':'var(--text2)';
-      const hubHit=actualHub!==null?tip.hub===actualHub:null;
-      const diffHit=actualDiff!==null?(tip.homeGoals-tip.awayGoals)===actualDiff:null;
-      const exactHit=hasScore?tip.homeGoals===score.homeGoals&&tip.awayGoals===score.awayGoals:null;
-      const ind=h=>h===null?'<span style="font-size:12px;color:var(--text3)">·</span>':h?'<span style="font-size:12px">✅</span>':'<span style="font-size:12px">❌</span>';
-
-      const fsHit=actualFS!==null?tip.firstScorer===actualFS:(isFT?false:null);
-      const fhgHit=actualFHG===null?null:actualFHG?(tip.firstHalfGoal==='Y'):(isFT?tip.firstHalfGoal==='N':null);
-      const pHit=(actual,field)=>actual===null?null:actual?(tip[field]==='Y'):(isFT?tip[field]==='N':null);
-      const playerBonusHtml=(MATCH_PLAYER_BETS[mk]||[]).map(pb=>{
-        const hit=pHit(pb.field in playerActuals?playerActuals[pb.field]:null, pb.field);
-        return`<span>🔵 ${pb.abbr} <strong style="color:${bonusCol(hit)}">${tip[pb.field]==='Y'?'Ja':'Nei'}</strong>${bonusInd(hit)}</span>`;
-      }).join('');
-      const bonusInd=h=>h===null?'':h?' ✅':' ❌';
-      const bonusCol=h=>h===true?'var(--green)':h===false?'var(--red)':'var(--text)';
-
-      const scorerLabel=tip.firstScorer==='H'?getTeamAbbr(match.home):tip.firstScorer==='A'?getTeamAbbr(match.away):'–';
-      const ptsColor=pts>0?'var(--green)':pts===0&&(isLive||isFT)?'var(--red)':'var(--text3)';
-
-      return`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border)">
-        ${avatarEl(p,pid)}
-        <div style="flex:0 0 auto">
-          <div style="font-size:13px;font-weight:600">${p.name}</div>
-          <div style="display:flex;align-items:center;gap:5px;margin-top:2px">
-            <span style="font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:1px">${tip.homeGoals}–${tip.awayGoals}</span>
-            <span style="font-size:10px;padding:1px 5px;border-radius:6px;background:${hubColor}22;color:${hubColor};font-weight:700">${hubAbbr}</span>
-          </div>
-        </div>
-        <div style="display:flex;gap:2px;align-items:center;flex-shrink:0">${ind(hubHit)}${ind(diffHit)}${ind(exactHit)}</div>
-        <div style="flex:1;display:flex;gap:10px;align-items:center;justify-content:center;font-size:12px;color:var(--text2);flex-wrap:wrap">
-          <span>⚽ <strong style="color:${bonusCol(fsHit)}">${scorerLabel}</strong>${bonusInd(fsHit)}</span>
-          <span>⏱️ <strong style="color:${bonusCol(fhgHit)}">${tip.firstHalfGoal==='Y'?'Ja':'Nei'}</strong>${bonusInd(fhgHit)}</span>
-          ${playerBonusHtml}
-        </div>
-        <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;min-width:36px;text-align:right;color:${ptsColor}">${pts}p</div>
-      </div>`;
-    }).join('');
-
-    const sep=mi>0?'border-top:1px solid var(--border2);margin-top:14px;padding-top:14px':'';
-    return`<div style="${sep}">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <div style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text2)">${teamFlag(match.home)}${match.home} vs ${teamFlag(match.away)}${match.away}</div>
-        <div style="display:flex;align-items:center;gap:6px">
-          ${hasScore?`<span style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1px">${score.homeGoals}–${score.awayGoals}</span>`:''}
-          ${isLive?'<span class="live-badge">LIVE</span>':isFT?'<span style="color:var(--green);font-size:11px;font-weight:700">FT</span>':''}
-        </div>
-      </div>
-      ${rows||'<div style="color:var(--text3);font-size:13px;padding:6px 0">Ingen tips enda</div>'}
+  function playerRow([id,p],rank){
+    const tip=getLiveTipPoints(id);
+    const sip=p.sipScore||0;
+    const tot=tip+sip;
+    const col=tot>0?'var(--green)':tot<0?'var(--red)':'var(--text3)';
+    return`<div style="display:flex;align-items:center;gap:5px;padding:4px 0;border-bottom:1px solid var(--border)">
+      <span style="font-family:'Bebas Neue',sans-serif;font-size:14px;color:var(--text3);width:20px;text-align:center">${rank}</span>
+      <div style="width:24px;height:24px;border-radius:50%;background:var(--bg4);flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden">${miniAvatar(p)}</div>
+      <div style="flex:1;font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:17px;color:${col};flex-shrink:0">${tot>0?'+':''}${tot}p</div>
     </div>`;
-  }).join('');
+  }
+
+  // Interleave into a flat grid of 2 cols
+  const rows=Array.from({length:maxRows},(_,i)=>`
+    ${left[i]?playerRow(left[i],sorted.indexOf(left[i])+1):'<div></div>'}
+    ${right[i]?playerRow(right[i],sorted.indexOf(right[i])+1):'<div></div>'}
+  `);
+
+  el.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px">${rows.join('')}</div>`;
 }
 
 // ─── TEST SCORE PANEL ───
