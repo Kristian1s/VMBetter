@@ -269,6 +269,7 @@ select option{background:var(--bg3)}
     <button class="tab" onclick="showTab('tipping')">🏆 Tippekonk</button>
     <button class="tab" onclick="showTab('betting')">🃏 Bookern</button>
     <button class="tab tab-tv" onclick="showTab('tv')">📺 Storskjerm</button>
+    <button class="tab tab-tv" onclick="showTab('stats')">📊 Stats</button>
   </div>
 </header>
 
@@ -408,6 +409,9 @@ select option{background:var(--bg3)}
 
   </div>
 
+  <!-- ===== STATS ===== -->
+  <div class="section" id="tab-stats" style="display:none"></div>
+
 </div>
 
 <div id="celebration">
@@ -490,8 +494,8 @@ onValue(ref(db,'config/matches'), s=>{
   if(currentTab==='spillere'&&isAdmin())renderAdminPlayers();
 });
 onValue(ref(db,'players'), s=>{ players=s.val()||{}; setSync(true); renderPlayers(); renderBettorSelect(); renderPlayerSelects(); if(currentTab==='poeng')renderScore(); if(currentTab==='tv')renderTV(); });
-onValue(ref(db,'bets'), s=>{ bets=s.val()||{}; if(currentTab==='betting')renderBets(); if(currentTab==='tv')renderTV(); if(currentTab==='spillere')renderPlayers(); });
-onValue(ref(db,'tips'), s=>{ tips=s.val()||{}; if(currentTab==='poeng')renderScore(); if(currentTab==='tv')renderTV(); if(currentTab==='spillere')renderPlayers(); });
+onValue(ref(db,'bets'), s=>{ bets=s.val()||{}; if(currentTab==='betting')renderBets(); if(currentTab==='tv')renderTV(); if(currentTab==='spillere')renderPlayers(); if(currentTab==='stats')renderStats(); });
+onValue(ref(db,'tips'), s=>{ tips=s.val()||{}; if(currentTab==='poeng')renderScore(); if(currentTab==='tv')renderTV(); if(currentTab==='spillere')renderPlayers(); if(currentTab==='stats')renderStats(); });
 
 function setSync(live){ document.getElementById('sync-dot').className='dot'+(live?' live':''); document.getElementById('sync-label').textContent=live?'Live':'Kobler til...'; }
 
@@ -501,15 +505,16 @@ window.showTab=function(id){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   document.getElementById('tab-'+id).classList.add('active');
-  ['spillere','tipping','betting','tv'].forEach((t,i)=>{ const el=document.querySelectorAll('.tab')[i]; if(el)el.classList.toggle('active',t===id); });
+  ['spillere','tipping','betting','tv','stats'].forEach((t,i)=>{ const el=document.querySelectorAll('.tab')[i]; if(el)el.classList.toggle('active',t===id); });
   const mw=document.getElementById('main-wrap');
-  if(id==='tv'){ mw.style.maxWidth='none'; mw.style.padding='0'; mw.style.height='calc(100vh - 62px)'; }
+  if(id==='tv'||id==='stats'){ mw.style.maxWidth='none'; mw.style.padding='0'; mw.style.height='calc(100vh - 62px)'; }
   else{ mw.style.maxWidth=''; mw.style.padding=''; mw.style.height=''; }
   if(id==='spillere')renderPlayers();
   if(id==='tipping'){ renderPlayerSelects(); renderLiveBox(); renderMatchButtons(); }
   if(id==='betting'){ renderBets(); renderBetCatalog(); renderMatchButtons(); }
   if(id==='poeng')renderScore();
   if(id==='tv')renderTV();
+  if(id==='stats')renderStats();
 };
 
 // ─── PLAYERS ───
@@ -1295,47 +1300,47 @@ function generateBetCatalog(mk, home, away, homeKey, awayKey){
   const ha=getTeamAbbr(home); const aa=getTeamAbbr(away);
   return{ home, away, homeKey:hk, awayKey:ak, categories:[
     { icon:"⚽", label:"Mål", bets:[
-      { id:"fg-home",    text:`${ha} scorer først`,               odds:1.5,  resolve:(s,ev,ht,fin)=>firstScorerTeam(ev,hk,fin) },
-      { id:"fg-away",    text:`${aa} scorer først`,               odds:3.5,  resolve:(s,ev,ht,fin)=>firstScorerTeam(ev,ak,fin) },
-      { id:"fg-15",      text:"Mål innen de første 15 min",       odds:2.5,  resolve:(s,ev,ht,fin)=>goalBefore(ev,16,fin) },
-      { id:"o15",        text:"Over 1,5 mål totalt",              odds:1.3,  resolve:(s,ev,ht,fin)=>overGoals(s,1.5,fin) },
-      { id:"o25",        text:"Over 2,5 mål totalt",              odds:1.8,  resolve:(s,ev,ht,fin)=>overGoals(s,2.5,fin) },
-      { id:"o35",        text:"Over 3,5 mål totalt",              odds:2.5,  resolve:(s,ev,ht,fin)=>overGoals(s,3.5,fin) },
-      { id:"o45",        text:"Over 4,5 mål totalt",              odds:3.5,  resolve:(s,ev,ht,fin)=>overGoals(s,4.5,fin) },
-      { id:"btts",       text:"Begge lag scorer",                 odds:2.0,  resolve:(s,ev,ht,fin)=>bothTeamsScored(s,fin) },
-      { id:"clean-h",    text:`${ha} holder nullen`,              odds:2.0,  resolve:(s,ev,ht,fin)=>fin?s.awayGoals===0:null },
-      { id:"clean-a",    text:`${aa} holder nullen`,              odds:5.0,  resolve:(s,ev,ht,fin)=>fin?s.homeGoals===0:null },
+      { id:"fg-home",    text:`${ha} scorer først`,               odds:1.8,  resolve:(s,ev,ht,fin)=>firstScorerTeam(ev,hk,fin) },
+      { id:"fg-away",    text:`${aa} scorer først`,               odds:4.0,  resolve:(s,ev,ht,fin)=>firstScorerTeam(ev,ak,fin) },
+      { id:"fg-15",      text:"Mål innen de første 15 min",       odds:3.0,  resolve:(s,ev,ht,fin)=>goalBefore(ev,16,fin) },
+      { id:"o15",        text:"Over 1,5 mål totalt",              odds:1.8,  resolve:(s,ev,ht,fin)=>overGoals(s,1.5,fin) },
+      { id:"o25",        text:"Over 2,5 mål totalt",              odds:2.2,  resolve:(s,ev,ht,fin)=>overGoals(s,2.5,fin) },
+      { id:"o35",        text:"Over 3,5 mål totalt",              odds:3.0,  resolve:(s,ev,ht,fin)=>overGoals(s,3.5,fin) },
+      { id:"o45",        text:"Over 4,5 mål totalt",              odds:4.5,  resolve:(s,ev,ht,fin)=>overGoals(s,4.5,fin) },
+      { id:"btts",       text:"Begge lag scorer",                 odds:2.5,  resolve:(s,ev,ht,fin)=>bothTeamsScored(s,fin) },
+      { id:"clean-h",    text:`${ha} holder nullen`,              odds:2.5,  resolve:(s,ev,ht,fin)=>fin?s.awayGoals===0:null },
+      { id:"clean-a",    text:`${aa} holder nullen`,              odds:6.0,  resolve:(s,ev,ht,fin)=>fin?s.homeGoals===0:null },
     ]},
     { icon:"🟨", label:"Kort & disiplin", bets:[
-      { id:"rc-any",     text:"Rødt kort i kampen",               odds:3.5,  resolve:(s,ev,ht,fin)=>hasCard(ev,"Red Card",fin) },
-      { id:"yc-o3",      text:"Over 3 gule kort totalt",          odds:2.0,  resolve:(s,ev,ht,fin)=>overCards(ev,"Yellow Card",3,fin) },
-      { id:"yc-o5",      text:"Over 5 gule kort totalt",          odds:4.0,  resolve:(s,ev,ht,fin)=>overCards(ev,"Yellow Card",5,fin) },
-      { id:"pen-any",    text:"Straffespark i kampen",            odds:3.0,  resolve:(s,ev,ht,fin)=>hasPenalty(ev,fin) },
-      { id:"pen-scored", text:"Straffespark scores",              odds:3.5,  resolve:(s,ev,ht,fin)=>penaltyScored(ev,fin) },
-      { id:"pen-miss",   text:"Straffespark brennes",             odds:9.0,  resolve:(s,ev,ht,fin)=>penaltyMissed(ev,fin) },
+      { id:"rc-any",     text:"Rødt kort i kampen",               odds:6.0,  resolve:(s,ev,ht,fin)=>hasCard(ev,"Red Card",fin) },
+      { id:"yc-o3",      text:"Over 3 gule kort totalt",          odds:2.8,  resolve:(s,ev,ht,fin)=>overCards(ev,"Yellow Card",3,fin) },
+      { id:"yc-o5",      text:"Over 5 gule kort totalt",          odds:5.5,  resolve:(s,ev,ht,fin)=>overCards(ev,"Yellow Card",5,fin) },
+      { id:"pen-any",    text:"Straffespark i kampen",            odds:4.0,  resolve:(s,ev,ht,fin)=>hasPenalty(ev,fin) },
+      { id:"pen-scored", text:"Straffespark scores",              odds:4.5,  resolve:(s,ev,ht,fin)=>penaltyScored(ev,fin) },
+      { id:"pen-miss",   text:"Straffespark brennes",             odds:10.0, resolve:(s,ev,ht,fin)=>penaltyMissed(ev,fin) },
     ]},
     { icon:"⏱️", label:"Omganger", bets:[
-      { id:"h1-goal",    text:"Mål i 1. omgang",                  odds:1.5,  resolve:(s,ev,ht)=>ht?(ht.home+ht.away)>0:null },
-      { id:"h1-nogoal",  text:"Ingen mål i 1. omgang",            odds:3.0,  resolve:(s,ev,ht)=>ht?(ht.home+ht.away)===0:null },
-      { id:"h1-home",    text:`${ha} leder til pause`,            odds:1.8,  resolve:(s,ev,ht)=>ht?ht.home>ht.away:null },
-      { id:"h1-away",    text:`${aa} leder til pause`,            odds:5.0,  resolve:(s,ev,ht)=>ht?ht.away>ht.home:null },
-      { id:"h1-draw",    text:"Uavgjort til pause",               odds:3.0,  resolve:(s,ev,ht)=>ht?ht.home===ht.away:null },
-      { id:"h2-more",    text:"Flest mål i 2. omgang",            odds:1.8,  resolve:(s,ev,ht,fin)=>fin&&ht?((s.homeGoals+s.awayGoals)-(ht.home+ht.away))>(ht.home+ht.away):null },
-      { id:"sub5",       text:"Totalt 5 eller flere bytter",      odds:1.5,  resolve:(s,ev,ht,fin)=>fin?countSubs(ev)>=5:countSubs(ev)>=5?true:null },
+      { id:"h1-goal",    text:"Mål i 1. omgang",                  odds:2.0,  resolve:(s,ev,ht)=>ht?(ht.home+ht.away)>0:null },
+      { id:"h1-nogoal",  text:"Ingen mål i 1. omgang",            odds:3.5,  resolve:(s,ev,ht)=>ht?(ht.home+ht.away)===0:null },
+      { id:"h1-home",    text:`${ha} leder til pause`,            odds:2.2,  resolve:(s,ev,ht)=>ht?ht.home>ht.away:null },
+      { id:"h1-away",    text:`${aa} leder til pause`,            odds:6.5,  resolve:(s,ev,ht)=>ht?ht.away>ht.home:null },
+      { id:"h1-draw",    text:"Uavgjort til pause",               odds:3.5,  resolve:(s,ev,ht)=>ht?ht.home===ht.away:null },
+      { id:"h2-more",    text:"Flest mål i 2. omgang",            odds:2.2,  resolve:(s,ev,ht,fin)=>fin&&ht?((s.homeGoals+s.awayGoals)-(ht.home+ht.away))>(ht.home+ht.away):null },
+      { id:"sub5",       text:"Totalt 5 eller flere bytter",      odds:2.0,  resolve:(s,ev,ht,fin)=>fin?countSubs(ev)>=5:countSubs(ev)>=5?true:null },
     ]},
     { icon:"🎯", label:"Eksakt sluttresultat", bets:[
-      { id:"res-10", text:`1–0 til ${ha}`, odds:5.0,  resolve:(s,ev,ht,fin)=>fin?s.homeGoals===1&&s.awayGoals===0:null },
-      { id:"res-20", text:`2–0 til ${ha}`, odds:5.5,  resolve:(s,ev,ht,fin)=>fin?s.homeGoals===2&&s.awayGoals===0:null },
-      { id:"res-21", text:`2–1 til ${ha}`, odds:6.0,  resolve:(s,ev,ht,fin)=>fin?s.homeGoals===2&&s.awayGoals===1:null },
-      { id:"res-30", text:`3–0 til ${ha}`, odds:7.0,  resolve:(s,ev,ht,fin)=>fin?s.homeGoals===3&&s.awayGoals===0:null },
-      { id:"res-00", text:"0–0 uavgjort",  odds:9.0,  resolve:(s,ev,ht,fin)=>fin?s.homeGoals===0&&s.awayGoals===0:null },
-      { id:"res-11", text:"1–1 uavgjort",  odds:7.0,  resolve:(s,ev,ht,fin)=>fin?s.homeGoals===1&&s.awayGoals===1:null },
-      { id:"res-01", text:`0–1 til ${aa}`, odds:9.0,  resolve:(s,ev,ht,fin)=>fin?s.homeGoals===0&&s.awayGoals===1:null },
-      { id:"res-02", text:`0–2 til ${aa}`, odds:12.0, resolve:(s,ev,ht,fin)=>fin?s.homeGoals===0&&s.awayGoals===2:null },
+      { id:"res-10", text:`1–0 til ${ha}`, odds:7.0,  resolve:(s,ev,ht,fin)=>fin?s.homeGoals===1&&s.awayGoals===0:null },
+      { id:"res-20", text:`2–0 til ${ha}`, odds:8.0,  resolve:(s,ev,ht,fin)=>fin?s.homeGoals===2&&s.awayGoals===0:null },
+      { id:"res-21", text:`2–1 til ${ha}`, odds:9.0,  resolve:(s,ev,ht,fin)=>fin?s.homeGoals===2&&s.awayGoals===1:null },
+      { id:"res-30", text:`3–0 til ${ha}`, odds:11.0, resolve:(s,ev,ht,fin)=>fin?s.homeGoals===3&&s.awayGoals===0:null },
+      { id:"res-00", text:"0–0 uavgjort",  odds:12.0, resolve:(s,ev,ht,fin)=>fin?s.homeGoals===0&&s.awayGoals===0:null },
+      { id:"res-11", text:"1–1 uavgjort",  odds:9.0,  resolve:(s,ev,ht,fin)=>fin?s.homeGoals===1&&s.awayGoals===1:null },
+      { id:"res-01", text:`0–1 til ${aa}`, odds:12.0, resolve:(s,ev,ht,fin)=>fin?s.homeGoals===0&&s.awayGoals===1:null },
+      { id:"res-02", text:`0–2 til ${aa}`, odds:16.0, resolve:(s,ev,ht,fin)=>fin?s.homeGoals===0&&s.awayGoals===2:null },
     ]},
     { icon:"🌟", label:"Spesial", bets:[
-      { id:"owngoal",    text:"Selvmål i kampen",                 odds:6.0,  resolve:(s,ev,ht,fin)=>hasOwnGoal(ev,fin) },
-      { id:"away-lead",  text:`${aa} leder på noe tidspunkt`,    odds:4.5,  resolve:(s,ev,ht,fin)=>{let h=0,a=0; for(const e of goalEvents(ev||[])){if(e.team?.name?.toLowerCase().includes(hk))h++;else a++;if(a>h)return true;} return fin?false:null;} },
+      { id:"owngoal",    text:"Selvmål i kampen",                 odds:8.0,  resolve:(s,ev,ht,fin)=>hasOwnGoal(ev,fin) },
+      { id:"away-lead",  text:`${aa} leder på noe tidspunkt`,    odds:5.5,  resolve:(s,ev,ht,fin)=>{let h=0,a=0; for(const e of goalEvents(ev||[])){if(e.team?.name?.toLowerCase().includes(hk))h++;else a++;if(a>h)return true;} return fin?false:null;} },
     ]},
   ]};
 }
@@ -1346,7 +1351,7 @@ function rebuildBetCatalogs(){
     const playerBets=(MATCH_PLAYER_BETS[mk]||[]).map(pb=>({
       id:`player-${pb.field}`,
       text:`${pb.label.replace('?','')} i kampen`,
-      odds:pb.field==='haaland'?1.6:pb.field==='mbappe'?1.8:3.5,
+      odds:pb.field==='haaland'?1.5:pb.field==='mbappe'?2.0:4.0,
       resolve:(s,ev,ht,fin)=>{
         const scored=goalEvents(ev).some(e=>pb.names.some(n=>e.player?.name?.toLowerCase().includes(n)));
         return scored?true:fin?false:null;
@@ -2017,6 +2022,148 @@ function renderScore(){
 // ─── TV VIEW ───
 function renderTV(){ renderTVPodium(); renderTVSlurkebet(); renderTVTips(); renderTVLive(); renderTVBets(); renderTVTicker(); }
 
+// ─── STATS TAB ───
+function renderStats(){
+  const el=document.getElementById('tab-stats'); if(!el)return;
+
+  const playerList=Object.entries(players);
+  if(!playerList.length){ el.innerHTML='<div style="padding:2rem;color:var(--text3);font-size:24px;text-align:center">Ingen spillere ennå</div>'; return; }
+
+  // ── Per-player computed stats ──
+  function pStats(pid){
+    const pb=Object.values(bets).filter(b=>b.placerId===pid&&!b.isParlay);
+    const parlays=Object.values(bets).filter(b=>b.placerId===pid&&b.isParlay);
+    const total=pb.length; const won=pb.filter(b=>b.status==='won').length;
+    const lost=pb.filter(b=>b.status==='lost').length;
+    const staked=getTokensSpent(pid); const paidOut=getTokensWon(pid);
+    const biggestPayout=Math.max(0,...pb.filter(b=>b.status==='won').map(b=>b.payout||0));
+    const avgOdds=total?parseFloat((pb.reduce((s,b)=>s+(b.odds||1),0)/total).toFixed(2)):0;
+    const winRate=total?Math.round(won/total*100):0;
+    const tipPts=getLiveTipPoints(pid);
+    const bal=getTokenBalance(pid);
+    return{total,won,lost,staked,paidOut,biggestPayout,avgOdds,winRate,tipPts,bal,parlayCount:parlays.length};
+  }
+  const stats=Object.fromEntries(playerList.map(([id])=>[id,pStats(id)]));
+
+  // ── Awards ──
+  function awardCard(emoji,title,subtitle,pid,statVal,color='var(--amber)'){
+    const p=players[pid]; if(!p)return'';
+    const av=p.avatar?.startsWith('data:')
+      ?`<img src="${p.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
+      :`<span style="font-size:28px;font-weight:700">${p.name.charAt(0).toUpperCase()}</span>`;
+    return`<div class="tv-card" style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:1rem;gap:8px">
+      <div style="font-size:40px;line-height:1">${emoji}</div>
+      <div style="font-size:16px;font-weight:700;color:${color};letter-spacing:.06em;text-transform:uppercase">${title}</div>
+      <div style="width:64px;height:64px;border-radius:50%;background:var(--bg4);display:flex;align-items:center;justify-content:center;overflow:hidden;border:2px solid ${color}">${av}</div>
+      <div style="font-size:26px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">${p.name}</div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:1px;color:${color};line-height:1">${statVal}</div>
+      <div style="font-size:14px;color:var(--text3)">${subtitle}</div>
+    </div>`;
+  }
+
+  // Find award winners
+  const withBets=playerList.filter(([id])=>stats[id].total>=1);
+  const withWins=playerList.filter(([id])=>stats[id].won>=1);
+  const tipLeader=playerList.sort((a,b)=>stats[b[0]].tipPts-stats[a[0]].tipPts)[0];
+  const richest=playerList.sort((a,b)=>stats[b[0]].bal-stats[a[0]].bal)[0];
+  const oracle=withWins.sort((a,b)=>stats[b[0]].won-stats[a[0]].won)[0];
+  const highRoller=withBets.filter(([id])=>stats[id].total>=2).sort((a,b)=>stats[b[0]].avgOdds-stats[a[0]].avgOdds)[0]||withBets[0];
+  const biggestWinBet=Object.values(bets).filter(b=>b.status==='won').sort((a,b)=>(b.payout||0)-(a.payout||0))[0];
+  const sharpest=withBets.filter(([id])=>stats[id].total>=2).sort((a,b)=>stats[b[0]].winRate-stats[a[0]].winRate)[0]||withBets[0];
+
+  const awards=[
+    tipLeader?awardCard('🎯','Tippekonk Leder','mest poeng totalt',tipLeader[0],`${stats[tipLeader[0]].tipPts}p`,'var(--blue)'):'',
+    richest?awardCard('💰','Rikeste','token-saldo',richest[0],`${stats[richest[0]].bal}T`,'var(--green)'):'',
+    oracle?awardCard('🔮','Orakelet','flest bets vunnet',oracle[0],`${stats[oracle[0]].won} treff`,'var(--amber)'):'',
+    sharpest&&stats[sharpest[0]].total>=2?awardCard('🏹','Skarpest','best treffratio',sharpest[0],`${stats[sharpest[0]].winRate}%`,'var(--green)'):'',
+    highRoller&&stats[highRoller[0]].total>=1?awardCard('🎲','High Roller','høyest snitt-odds',highRoller[0],`${stats[highRoller[0]].avgOdds}×`,'var(--red)'):'',
+    biggestWinBet?awardCard('💥','Beste Bet',biggestWinBet.desc.substring(0,28),biggestWinBet.placerId||Object.keys(players).find(id=>players[id]?.name===biggestWinBet.placerName)||playerList[0]?.[0],`+${biggestWinBet.payout}T`,'var(--gold)'):'',
+  ].filter(Boolean);
+
+  // ── Win-rate bars ──
+  const sortedByWinRate=[...playerList].filter(([id])=>stats[id].total>0).sort((a,b)=>stats[b[0]].winRate-stats[a[0]].winRate);
+  const winRateRows=sortedByWinRate.map(([id,p])=>{
+    const s=stats[id];
+    const col=s.winRate>=60?'var(--green)':s.winRate>=40?'var(--amber)':'var(--red)';
+    return`<div style="margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+        <span style="font-size:20px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${p.name}</span>
+        <span style="font-size:20px;font-weight:700;color:${col};margin-left:8px">${s.winRate}%</span>
+        <span style="font-size:14px;color:var(--text3);margin-left:6px">${s.won}/${s.total}</span>
+      </div>
+      <div style="background:var(--bg3);border-radius:4px;height:10px;overflow:hidden">
+        <div style="width:${s.winRate}%;background:${col};height:100%;border-radius:4px;transition:width .5s"></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // ── Bet category breakdown ──
+  const catStats={};
+  Object.values(bets).filter(b=>!b.isParlay).forEach(b=>{
+    for(const[mk,cat]of Object.entries(BET_CATALOG||{})){
+      for(const c of cat.categories||[]){
+        if(c.bets.some(x=>x.id===b.betId)){
+          const k=c.label;
+          if(!catStats[k])catStats[k]={label:c.label,icon:c.icon,placed:0,won:0,tokens:0};
+          catStats[k].placed++;
+          if(b.status==='won')catStats[k].won++;
+          catStats[k].tokens+=(b.stake||0);
+          break;
+        }
+      }
+    }
+  });
+  const catRows=Object.values(catStats).sort((a,b)=>b.placed-a.placed).map(c=>{
+    const wr=c.placed?Math.round(c.won/c.placed*100):0;
+    const col=wr>=60?'var(--green)':wr>=30?'var(--amber)':'var(--red)';
+    return`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+      <span style="font-size:24px">${c.icon}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:20px;font-weight:600">${c.label}</div>
+        <div style="font-size:14px;color:var(--text3)">${c.placed} bets · ${c.tokens}T satset</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:22px;font-weight:700;color:${col}">${wr}%</div>
+        <div style="font-size:13px;color:var(--text3)">${c.won}/${c.placed} treff</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // ── Total wagered / market size ──
+  const totalBets=Object.values(bets).length;
+  const totalTokensWagered=Object.values(bets).reduce((s,b)=>s+(b.stake||0),0);
+  const totalWon=Object.values(bets).filter(b=>b.status==='won').reduce((s,b)=>s+(b.payout||0),0);
+  const overallWinRate=totalBets?Math.round(Object.values(bets).filter(b=>b.status==='won').length/totalBets*100):0;
+
+  const awardCols=Math.min(awards.length,6);
+  el.innerHTML=`<div style="display:grid;grid-template-columns:repeat(${awardCols},1fr);grid-template-rows:auto 1fr;gap:14px;padding:1.25rem;height:100%;box-sizing:border-box">
+
+    <!-- Awards row -->
+    <div style="grid-column:1/-1;display:grid;grid-template-columns:repeat(${awardCols},1fr);gap:14px">
+      ${awards.join('')}
+    </div>
+
+    <!-- Win rate panel -->
+    <div class="tv-card tv-col-scroll" style="grid-column:1/${Math.ceil(awardCols/2)+1}">
+      <div class="tv-title" style="font-size:20px;margin-bottom:.75rem">📈 Treffratio per spiller</div>
+      ${sortedByWinRate.length?winRateRows:`<div style="color:var(--text3);font-size:20px">Ingen bets ennå</div>`}
+    </div>
+
+    <!-- Category breakdown panel -->
+    <div class="tv-card tv-col-scroll" style="grid-column:${Math.ceil(awardCols/2)+1}/-1">
+      <div class="tv-title" style="font-size:20px;margin-bottom:.75rem">🃏 Bet-kategorier</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;margin-bottom:12px">
+        <div style="font-size:18px;color:var(--text2)">Totale bets: <strong style="color:var(--text)">${totalBets}</strong></div>
+        <div style="font-size:18px;color:var(--text2)">Tokens satset: <strong style="color:var(--text)">${totalTokensWagered}T</strong></div>
+        <div style="font-size:18px;color:var(--text2)">Tokens delt ut: <strong style="color:var(--green)">${totalWon}T</strong></div>
+        <div style="font-size:18px;color:var(--text2)">Treffratio: <strong style="color:${overallWinRate>=50?'var(--green)':'var(--amber)'}">${overallWinRate}%</strong></div>
+      </div>
+      ${catRows||`<div style="color:var(--text3);font-size:20px">Ingen bets ennå</div>`}
+    </div>
+
+  </div>`;
+}
+
 let tvTickerKnownIds=new Set();
 function renderTVTicker(){
   const el=document.getElementById('tv-ticker'); if(!el)return;
@@ -2071,7 +2218,10 @@ function renderTVTicker(){
         }).join('')}</div>`
       :'';
     return`<div class="tv-ticker-card${isNew?' new':''}" style="border-color:${borderCol};background:rgba(239,159,39,0.06)">
-      <div style="font-size:13px;font-weight:700;color:var(--amber);letter-spacing:.06em;text-transform:uppercase;margin-bottom:3px">🃏 Bookern</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+        <span style="font-size:13px;font-weight:700;color:var(--amber);letter-spacing:.06em;text-transform:uppercase">🃏 Bookern</span>
+        <span style="font-size:13px;color:var(--text3)">${b.matchLabel||''}</span>
+      </div>
       <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:3px">
         <span style="font-size:28px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${b.placerName}</span>
         <span style="font-size:24px;font-weight:700;color:${oddsCol};flex-shrink:0">${b.odds}×${statusIcon}</span>
