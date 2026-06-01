@@ -975,16 +975,15 @@ function renderLiveBox(){
 
 // ─── TIPPING ───
 function showKickoffLock(mk,score,el){
-  const match=MATCHES[mk];
   const done=score.status==='FT';
   el.innerHTML=`<div class="card" style="border-color:${done?'var(--green)':'var(--red)'}">
     <div style="display:flex;align-items:center;gap:10px">
-      <span style="font-size:22px">${done?'✅':'🔴'}</span>
+      <span style="font-size:22px">${done?'✅':'🔒'}</span>
       <div style="flex:1">
-        <div style="font-weight:600;font-size:15px">${done?'Kamp ferdig':'Kampen er i gang!'}</div>
-        <div style="font-size:12px;color:var(--text2)">Tipping er stengt</div>
+        <div style="font-weight:600">${done?'Kamp ferdig':'Kampen er i gang – Tipping stengt!'}</div>
+        <div style="font-size:12px;color:var(--text2)">Ingen nye tipps kan legges inn</div>
       </div>
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:32px;letter-spacing:1px">${score.homeGoals} – ${score.awayGoals}</div>
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:28px">${score.homeGoals} – ${score.awayGoals}</div>
     </div>
   </div>`;
 }
@@ -2023,11 +2022,7 @@ function renderTVTips(){
     const playerList=getSorted();
     const rows=playerList.map(([pid,p])=>{
       const tip=Object.values(tips).find(t=>t.playerId===pid&&t.matchKey===mk);
-      if(!tip) return`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);opacity:0.3">
-        ${avatarEl(p,pid)}
-        <div style="flex:1;font-size:13px;color:var(--text3)">${p.name}</div>
-        <div style="font-size:11px;color:var(--text3)">Ikke tippet</div>
-      </div>`;
+      if(!tip) return '';
 
       const pts=getTipPoints(tip);
       const hubAbbr=tip.hub==='H'?getTeamAbbr(match.home):tip.hub==='B'?getTeamAbbr(match.away):'U';
