@@ -2015,7 +2015,7 @@ function renderTVTips(){
     const score=liveScores[mk];
     const isLive=score&&['1H','HT','2H','ET','P'].includes(score.status);
     const isFT=score&&score.status==='FT';
-    const hasScore=score&&typeof score.homeGoals==='number';
+    const hasScore=score&&score.status!=='NS'&&typeof score.homeGoals==='number';
     const actualHub=hasScore?(score.homeGoals>score.awayGoals?'H':score.homeGoals<score.awayGoals?'B':'U'):null;
     const actualDiff=hasScore?score.homeGoals-score.awayGoals:null;
 
