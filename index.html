@@ -392,7 +392,7 @@ const RAPID_KEY = "86b71ea67bmsh076351ff0c7fb59p12fb39jsnb660034bd93f";
 let MATCHES = {};   // populated from Firebase config/matches
 let BET_CATALOG = {}; // generated from MATCHES via generateBetCatalog()
 
-const MAX_SLURK_BUDGET = 20;
+const MAX_SLURK_BUDGET = 10;
 function getSlurkerSpent(pid){ return Object.values(bets).filter(b=>b.placerId===pid).reduce((s,b)=>s+(b.stake||0),0); }
 function getSlurkerWon(pid){ return Object.values(bets).filter(b=>b.placerId===pid&&b.status==='won').reduce((s,b)=>s+(b.payout||0),0); }
 function getRemainingBudget(pid){ return pid?Math.max(0,MAX_SLURK_BUDGET-getSlurkerSpent(pid)):MAX_SLURK_BUDGET; }
@@ -1000,6 +1000,101 @@ window.selectTipMatch=function(mk){
   });
   renderTipForm();
 };
+function makeDrumPicker(inputId, min=0, max=15){
+  const ITEM_H=48, VISIBLE=5, PAD=Math.floor(VISIBLE/2);
+  let value=parseInt(document.getElementById(inputId)?.value??min);
+  if(isNaN(value))value=min;
+
+  const wrap=document.createElement('div');
+  wrap.style.cssText=`position:relative;width:68px;height:${ITEM_H*VISIBLE}px;overflow:hidden;touch-action:none;user-select:none;border-radius:12px;background:var(--bg3);border:1px solid var(--border2);cursor:ns-resize`;
+
+  const inner=document.createElement('div');
+  inner.style.cssText='will-change:transform;';
+
+  const allItems=[];
+  for(let i=0;i<PAD;i++){
+    const el=document.createElement('div');
+    el.style.cssText=`height:${ITEM_H}px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600;color:var(--text3)`;
+    inner.appendChild(el); allItems.push({el,val:null});
+  }
+  for(let v=min;v<=max;v++){
+    const el=document.createElement('div');
+    el.style.cssText=`height:${ITEM_H}px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600;color:var(--text3)`;
+    el.textContent=v;
+    inner.appendChild(el); allItems.push({el,val:v});
+  }
+  for(let i=0;i<PAD;i++){
+    const el=document.createElement('div');
+    el.style.cssText=`height:${ITEM_H}px;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600;color:var(--text3)`;
+    inner.appendChild(el); allItems.push({el,val:null});
+  }
+  wrap.appendChild(inner);
+
+  // Fade overlays
+  const topG=document.createElement('div');
+  topG.style.cssText=`position:absolute;top:0;left:0;right:0;height:${ITEM_H*PAD}px;background:linear-gradient(to bottom,var(--bg3) 20%,transparent);pointer-events:none;z-index:2`;
+  const botG=document.createElement('div');
+  botG.style.cssText=`position:absolute;bottom:0;left:0;right:0;height:${ITEM_H*PAD}px;background:linear-gradient(to top,var(--bg3) 20%,transparent);pointer-events:none;z-index:2`;
+  // Center selection band
+  const band=document.createElement('div');
+  band.style.cssText=`position:absolute;top:${ITEM_H*PAD}px;left:6px;right:6px;height:${ITEM_H}px;border-top:1px solid var(--border2);border-bottom:1px solid var(--border2);border-radius:6px;pointer-events:none;z-index:1`;
+  wrap.appendChild(topG); wrap.appendChild(botG); wrap.appendChild(band);
+
+  function getOffset(v){ return -((v-min)*ITEM_H); }
+  function applyOffset(off,animate){
+    inner.style.transition=animate?'transform 0.2s cubic-bezier(.25,.46,.45,.94)':'none';
+    inner.style.transform=`translateY(${off}px)`;
+  }
+  function highlight(v){
+    allItems.forEach(({el,val})=>{
+      const sel=val===v;
+      el.style.color=sel?'var(--text)':'var(--text3)';
+      el.style.fontSize=sel?'26px':'19px';
+    });
+    const inp=document.getElementById(inputId);
+    if(inp)inp.value=v;
+  }
+
+  let curOff=getOffset(value);
+  applyOffset(curOff,false); highlight(value);
+
+  let startY=0, startOff=0, dragging=false;
+
+  wrap.addEventListener('pointerdown',e=>{
+    dragging=true; startY=e.clientY; startOff=curOff;
+    inner.style.transition='none';
+    wrap.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  wrap.addEventListener('pointermove',e=>{
+    if(!dragging)return;
+    const dy=e.clientY-startY;
+    const raw=startOff+dy;
+    const lo=getOffset(max), hi=getOffset(min);
+    // Elastic resistance at edges
+    curOff=raw<lo?lo+(raw-lo)*0.25:raw>hi?hi+(raw-hi)*0.25:raw;
+    inner.style.transform=`translateY(${curOff}px)`;
+    highlight(Math.max(min,Math.min(max,Math.round(min+(-curOff/ITEM_H)))));
+    e.preventDefault();
+  });
+  function release(){
+    if(!dragging)return; dragging=false;
+    value=Math.max(min,Math.min(max,Math.round(min+(-curOff/ITEM_H))));
+    curOff=getOffset(value);
+    applyOffset(curOff,true); highlight(value);
+  }
+  wrap.addEventListener('pointerup',release);
+  wrap.addEventListener('pointercancel',release);
+  wrap.addEventListener('wheel',e=>{
+    e.preventDefault();
+    value=Math.max(min,Math.min(max,value+(e.deltaY>0?1:-1)));
+    curOff=getOffset(value);
+    applyOffset(curOff,true); highlight(value);
+  },{passive:false});
+
+  return wrap;
+}
+
 window.renderTipForm=function(){
   const mk=selectedTipMatch;
   renderLiveBox();
@@ -1023,9 +1118,11 @@ window.renderTipForm=function(){
     <div class="card"><div class="card-label">Stilling — maks 6 poeng</div>
       <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Rett målforskjell +3p · Eksakt stilling +3p ekstra</div>
       <div class="score-inp-row">
-        <input type="number" id="tip-hg" min="0" max="20" value="0">
-        <span style="font-size:22px;font-weight:700;color:var(--text2)">–</span>
-        <input type="number" id="tip-ag" min="0" max="20" value="0">
+        <div id="drum-hg-wrap"></div>
+        <input type="hidden" id="tip-hg" value="0">
+        <span style="font-size:28px;font-weight:700;color:var(--text2)">–</span>
+        <div id="drum-ag-wrap"></div>
+        <input type="hidden" id="tip-ag" value="0">
       </div>
       <div style="text-align:center;font-size:12px;color:var(--text2)">${match.home} – ${match.away}</div></div>
     <div class="card"><div class="card-label">Bonusspørsmål — 2 poeng hver</div>
@@ -1047,6 +1144,8 @@ window.renderTipForm=function(){
       </div></div>
     <button class="btn btn-primary btn-full" onclick="submitTip('${mk}')">Send inn tipp 🎯</button>
     <div id="tip-status" style="margin-top:10px"></div>`;
+  document.getElementById('drum-hg-wrap')?.appendChild(makeDrumPicker('tip-hg'));
+  document.getElementById('drum-ag-wrap')?.appendChild(makeDrumPicker('tip-ag'));
 };
 window.selHub=function(v){ tipForm.hub=v; ['H','U','B'].forEach(x=>document.getElementById('hub-'+x)?.classList.toggle('selected',x===v)); };
 window.selBonus=function(field,val,el){ tipForm[field]=val; const pfx={firstScorer:'fs',redCard:'rc',firstHalfGoal:'fhg'}[field]; document.querySelectorAll(`[id^="${pfx}-"]`).forEach(e=>e.classList.remove('selected')); el.classList.add('selected'); };
