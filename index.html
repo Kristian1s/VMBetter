@@ -397,7 +397,12 @@ select option{background:var(--bg3)}
 
     <!-- ROW 3: Bet ticker — spans all columns -->
     <div class="tv-card" style="grid-column:1/4;grid-row:3;padding:.75rem 1rem">
-      <div class="tv-title" style="margin-bottom:.6rem;font-size:14px">🎯 SISTE BETS</div>
+      <div class="tv-title" style="margin-bottom:.6rem;font-size:22px">
+        <span style="color:var(--blue)">🏆 TIPPEKONK</span>
+        <span style="color:var(--text3);margin:0 10px">·</span>
+        <span style="color:var(--amber)">🃏 BOOKERN</span>
+        <span style="color:var(--text3);font-size:16px;margin-left:10px">— siste aktivitet</span>
+      </div>
       <div id="tv-ticker" class="tv-ticker"></div>
     </div>
 
@@ -2015,33 +2020,59 @@ function renderTV(){ renderTVPodium(); renderTVSlurkebet(); renderTVTips(); rend
 let tvTickerKnownIds=new Set();
 function renderTVTicker(){
   const el=document.getElementById('tv-ticker'); if(!el)return;
-  // Newest first, max 18 (6 cols × 3 rows)
-  const sorted=Object.entries(bets)
-    .sort(([,a],[,b])=>(b.createdAt||0)-(a.createdAt||0))
-    .slice(0,8); // 4 cols × 2 rows
-  if(!sorted.length){
-    el.innerHTML='<div style="color:var(--text3);font-size:13px;grid-column:1/-1;text-align:center;padding:.5rem">Ingen bets plassert ennå</div>';
+
+  // Merge bets and tips into one stream, newest first, max 8 cards (4×2)
+  const betItems=Object.entries(bets).map(([id,b])=>({uid:'b_'+id,kind:'bet',createdAt:b.createdAt||0,data:b}));
+  const tipItems=Object.entries(tips).map(([id,t])=>({uid:'t_'+id,kind:'tip',createdAt:t.createdAt||0,data:t}));
+  const all=[...betItems,...tipItems].sort((a,b)=>b.createdAt-a.createdAt).slice(0,8);
+
+  if(!all.length){
+    el.innerHTML='<div style="color:var(--text3);font-size:28px;grid-column:1/-1;text-align:center;padding:.5rem">Ingen aktivitet ennå</div>';
     return;
   }
-  const newIds=new Set(sorted.filter(([id])=>!tvTickerKnownIds.has(id)).map(([id])=>id));
-  el.innerHTML=sorted.map(([id,b])=>{
+
+  const newIds=new Set(all.filter(x=>!tvTickerKnownIds.has(x.uid)).map(x=>x.uid));
+
+  el.innerHTML=all.map(({uid,kind,data:d})=>{
+    const isNew=newIds.has(uid);
+
+    if(kind==='tip'){
+      const match=MATCHES[d.matchKey];
+      const pts=getTipPoints(d);
+      const hasPts=pts>0;
+      const hubAbbr=d.hub==='H'?getTeamAbbr(match?.home||'H'):d.hub==='B'?getTeamAbbr(match?.away||'B'):'U';
+      // Blue tint for Tippekonk
+      const borderCol=hasPts?'var(--green)':'var(--blue)';
+      const accentCol='var(--blue)';
+      return`<div class="tv-ticker-card${isNew?' new':''}" style="border-color:${borderCol};background:rgba(74,144,217,0.06)">
+        <div style="font-size:13px;font-weight:700;color:${accentCol};letter-spacing:.06em;text-transform:uppercase;margin-bottom:3px">🏆 Tippekonk</div>
+        <div style="font-size:28px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.playerName||d.placerName||''}</div>
+        <div style="font-size:22px;color:var(--text2);margin:2px 0">
+          <span style="font-family:'Bebas Neue',sans-serif;letter-spacing:1px">${d.homeGoals}–${d.awayGoals}</span>
+          <span style="font-size:16px;padding:1px 6px;border-radius:6px;background:var(--blue-light);color:var(--blue);font-weight:700;margin-left:6px">${hubAbbr}</span>
+        </div>
+        <div style="font-size:20px;color:${hasPts?'var(--green)':'var(--text3)'};margin-top:2px">${match?.label||d.matchKey||''} · ${hasPts?pts+'p':'⏳'}</div>
+      </div>`;
+    }
+
+    // Bookern bet
+    const b=d;
     const won=b.status==='won', lost=b.status==='lost';
-    const borderCol=won?'var(--green)':lost?'var(--red)':'var(--border)';
+    const borderCol=won?'var(--green)':lost?'var(--red)':'var(--amber)';
     const oddsCol=won?'var(--green)':lost?'var(--red)':'var(--amber)';
     const statusIcon=won?' 🎉':lost?' ❌':'';
-    // For parlays show first keyword of each leg to keep it compact
     const descText=b.isParlay&&b.legs
       ?'🔗 '+b.legs.map(l=>l.desc.split(' ').slice(0,2).join(' ')).join(' + ')
       :b.desc;
-    // Parlay leg colour indicators
     const legDots=b.isParlay&&b.legs
       ?`<div style="display:flex;gap:4px;margin-top:3px;flex-wrap:wrap">${b.legs.map(l=>{
           const st=getParlayLegStatus(l);
           return`<span style="font-size:18px;color:${st==='won'?'var(--green)':st==='lost'?'var(--red)':'var(--text3)'}">${st==='won'?'✅':st==='lost'?'❌':'⏳'}</span>`;
         }).join('')}</div>`
       :'';
-    return`<div class="tv-ticker-card${newIds.has(id)?' new':''}" style="border-color:${borderCol}">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:4px">
+    return`<div class="tv-ticker-card${isNew?' new':''}" style="border-color:${borderCol};background:rgba(239,159,39,0.06)">
+      <div style="font-size:13px;font-weight:700;color:var(--amber);letter-spacing:.06em;text-transform:uppercase;margin-bottom:3px">🃏 Bookern</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:3px">
         <span style="font-size:28px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${b.placerName}</span>
         <span style="font-size:24px;font-weight:700;color:${oddsCol};flex-shrink:0">${b.odds}×${statusIcon}</span>
       </div>
@@ -2050,7 +2081,8 @@ function renderTVTicker(){
       <div style="font-size:20px;color:var(--text3);margin-top:3px">🎯${b.stake} → 🏆<strong style="color:${won?'var(--green)':'var(--text)'}">${b.payout}</strong></div>
     </div>`;
   }).join('');
-  sorted.forEach(([id])=>tvTickerKnownIds.add(id));
+
+  all.forEach(x=>tvTickerKnownIds.add(x.uid));
 }
 
 function miiHTML(p, id, spotClass){
@@ -2313,17 +2345,12 @@ function renderTVBets(){
     <div>
       <div style="font-size:16px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid var(--border)">Token-saldo</div>
       ${balList.slice(0,10).map(([id,p,bal],i)=>{
-        const profit=bal-TOKEN_BUDGET;
-        const profCol=profit>0?'var(--green)':profit<0?'var(--red)':'var(--text3)';
         const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
         return`<div style="display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border)">
           <span style="font-family:'Bebas Neue',sans-serif;font-size:34px;color:var(--text3);width:40px;text-align:center;flex-shrink:0">${medal||(i+1)}</span>
           <div style="width:44px;height:44px;border-radius:50%;background:var(--bg4);flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden">${tvAvatar(p)}</div>
           <div style="flex:1;font-size:28px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</div>
-          <div style="text-align:right;flex-shrink:0">
-            <span style="font-family:'Bebas Neue',sans-serif;font-size:38px;letter-spacing:.5px">${bal}</span>
-            <span style="font-size:20px;color:${profCol};margin-left:6px">${profit>0?'+':''}${profit}</span>
-          </div>
+          <div style="font-family:'Bebas Neue',sans-serif;font-size:38px;letter-spacing:.5px;flex-shrink:0">${bal}</div>
         </div>`;
       }).join('')}
     </div>
