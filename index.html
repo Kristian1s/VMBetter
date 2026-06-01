@@ -761,13 +761,19 @@ async function fetchESPN(league, eventId){
       const playerMatch=text.match(/\.\s+([^(]+?)\s+\(([^)]+)\)/);
       const player=playerMatch?playerMatch[1].trim():'';
       const team=playerMatch?playerMatch[2].trim():'';
-      if(tt.startsWith('goal')){
+      if(tt.includes('goal')){
         const detail=tt.includes('own')?'Own Goal':tt.includes('pen')?'Penalty':'Normal Goal';
         return{type:'Goal',detail,team:{name:team},player:{name:player},time:{elapsed:min}};
       }
       if(tt.includes('yellow'))return{type:'Card',detail:'Yellow Card',team:{name:team},player:{name:player},time:{elapsed:min}};
-      if(tt.includes('red'))  return{type:'Card',detail:'Red Card',team:{name:team},player:{name:player},time:{elapsed:min}};
-      if(tt.includes('sub'))  return{type:'subst',player:{name:player},team:{name:team},time:{elapsed:min}};
+      if(tt.includes('red')&&!tt.includes('goal'))return{type:'Card',detail:'Red Card',team:{name:team},player:{name:player},time:{elapsed:min}};
+      if(tt.includes('sub')){
+        // Try to extract both player-out and player-in from substitution text
+        const allNames=[...text.matchAll(/([A-Z][^.(,\n]{1,28}?)\s*\(([^)]{1,30})\)/g)].map(m=>m[1].trim());
+        const out=allNames[0]||player||'';
+        const playerIn=allNames[1]||'';
+        return{type:'subst',player:{name:out},assist:playerIn?{name:playerIn}:null,team:{name:team},time:{elapsed:min}};
+      }
       if(tt.includes('miss')||tt.includes('penalty-miss'))return{type:'Miss',detail:'Missed Penalty',team:{name:team},player:{name:player},time:{elapsed:min}};
       return null;
     }).filter(Boolean);
@@ -788,8 +794,15 @@ async function fetchESPN(league, eventId){
 
 // ─── MATCH CLOCK ───
 function syncClock(mk, s){
-  if(['1H','2H','ET'].includes(s.status))
-    matchClocks[mk]={ elapsed:s.elapsed||0, pollTime:Date.now() };
+  if(!['1H','2H','ET'].includes(s.status)) return;
+  const newElapsed = s.elapsed || 0;
+  const prev = matchClocks[mk];
+  // Only reset the anchor when the elapsed minute actually changes.
+  // If elapsed is unchanged, leave pollTime alone so the counter keeps ticking
+  // smoothly between polls instead of resetting to :00 every 20 seconds.
+  if(!prev || newElapsed !== prev.elapsed){
+    matchClocks[mk] = { elapsed: newElapsed, pollTime: Date.now() };
+  }
 }
 function getClockDisplay(mk){
   const s=liveScores[mk]; if(!s)return'';
@@ -931,7 +944,7 @@ function renderLiveBox(){
   const mk=selectedTipMatch;
   const score=mk?liveScores[mk]:null;
   const match=mk?MATCHES[mk]:null;
-  if(!score||!match){ el.innerHTML=match?`<div class="live-box"><div style="color:var(--text3);font-size:14px">Ingen live data for ${match.label}</div></div>`:''; return; }
+  if(!score||!match||score.status==='NS'){ el.innerHTML=''; return; }
   const isLive=['1H','HT','2H','ET','P'].includes(score.status);
   const clock=getClockDisplay(mk);
   el.innerHTML=`<div class="live-box">
@@ -1336,30 +1349,44 @@ function autoResolveBets(mk, score){
     }
   }
 
-  if(Object.keys(upd).length) update(ref(db), upd);
-
-  // Trigger celebration for new wins
-  for(const{id,bet}of wins){
-    if(!alreadyCelebrated.has(id)){
-      alreadyCelebrated.add(id);
-      triggerCelebration(bet);
+  // When match is final, close out any bets that couldn't be resolved (unknown betId, null resolver, etc.)
+  if(isFin){
+    for(const[id]of openBets){
+      if(!upd[`bets/${id}/status`])upd[`bets/${id}/status`]='lost';
     }
   }
+
+  if(Object.keys(upd).length) update(ref(db), upd);
+
+  // Trigger celebration for new wins (batched so multiple wins show together)
+  const newWins=wins.filter(({id})=>!alreadyCelebrated.has(id));
+  newWins.forEach(({id})=>alreadyCelebrated.add(id));
+  if(newWins.length)triggerCelebration(newWins.map(({bet})=>bet));
 }
 
 // ─── CELEBRATION ───
-function triggerCelebration(bet){
-  const el = document.getElementById('celebration');
-  const isGoal = bet.desc?.toLowerCase().includes('scorer')||bet.desc?.toLowerCase().includes('mål')||bet.desc?.toLowerCase().includes('hattrick');
-  const emoji = isGoal?'⚽':bet.desc?.includes('kort')?'🟨':bet.desc?.includes('straffe')?'🎯':'🎉';
-  document.getElementById('celeb-emoji').textContent = emoji;
-  document.getElementById('celeb-title').textContent = isGoal?'MÅÅÅL!':'TREFFER!';
-  document.getElementById('celeb-desc').textContent = bet.desc;
-  document.getElementById('celeb-placer').textContent = `${bet.placerName} vinner!`;
-  document.getElementById('celeb-payout').textContent = `🍺 Del ut ${bet.payout} slurker!`;
+function triggerCelebration(bets){
+  if(!Array.isArray(bets))bets=[bets];
+  const el=document.getElementById('celebration');
+  const multi=bets.length>1;
+  const first=bets[0];
+  const hasGoal=bets.some(b=>b.desc?.toLowerCase().includes('scorer')||b.desc?.toLowerCase().includes('mål')||b.desc?.toLowerCase().includes('hattrick'));
+  const emoji=multi?'🎉':hasGoal?'⚽':first.desc?.includes('kort')?'🟨':first.desc?.includes('straffe')?'🎯':'🎉';
+  const title=multi?`${bets.length} TREFF!`:hasGoal?'MÅÅÅL!':'TREFFER!';
+  const placers=[...new Set(bets.map(b=>b.placerName))].join(' & ');
+  const totalPayout=bets.reduce((s,b)=>s+(b.payout||0),0);
+  document.getElementById('celeb-emoji').textContent=emoji;
+  document.getElementById('celeb-title').textContent=title;
+  document.getElementById('celeb-desc').innerHTML=multi
+    ?bets.map(b=>`<span style="font-size:16px;display:block;margin:2px 0">${b.placerName}: ${b.desc}</span>`).join('')
+    :first.desc;
+  document.getElementById('celeb-placer').textContent=`${placers} vinner!`;
+  document.getElementById('celeb-payout').textContent=multi
+    ?`🍺 Del ut totalt ${totalPayout} slurker!`
+    :`🍺 Del ut ${first.payout} slurker!`;
   spawnConfetti();
   el.classList.add('show');
-  setTimeout(()=>{ el.classList.remove('show'); }, 6000);
+  setTimeout(()=>el.classList.remove('show'),6000);
 }
 
 function spawnConfetti(){
@@ -1786,7 +1813,7 @@ function renderTVLive(){
     const isFT=s.status==='FT';
     const clock=getClockDisplay(mk);
     const sep=i>0?'border-top:1px solid var(--border);margin-top:16px;padding-top:16px':'';
-    const importantEvs=(s.events||[]).filter(e=>e.type==='Goal'||e.type==='Card'||e.type==='Miss'||e.type==='subst');
+    const importantEvs=[...(s.events||[])].reverse().filter(e=>e.type==='Goal'||e.type==='Card'||e.type==='Miss'||e.type==='subst');
     return`<div style="${sep}">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
         <span style="font-size:13px;color:var(--text2)">${m?.label||mk}</span>
@@ -1795,13 +1822,18 @@ function renderTVLive(){
       <div class="tv-live-score">${s.homeGoals} – ${s.awayGoals}</div>
       <div style="text-align:center;font-family:'Bebas Neue',sans-serif;font-size:32px;color:${isLive?'var(--green)':isFT?'var(--text2)':'var(--text3)'};letter-spacing:1px;margin:4px 0">${clock}</div>
       ${importantEvs.length?`<div class="tv-event-feed">${importantEvs.map(e=>{
-        const icon=e.type==='Goal'?(e.detail==='Own Goal'?'🔄':e.detail==='Penalty'?'⚽🅿️':'⚽'):e.type==='Miss'?'❌':e.type==='subst'?'🔄':e.detail==='Red Card'?'🟥':'🟨';
-        const label=e.type==='subst'?`${e.player?.name||''} ↔ ${e.assist?.name||''}`:e.player?.name||'';
-        return`<div style="display:flex;align-items:center;gap:8px;font-size:13px;opacity:${e.type==='subst'?'0.65':'1'}">
+        const icon=e.type==='Goal'?(e.detail==='Own Goal'?'🔄':e.detail==='Penalty'?'⚽🅿️':'⚽'):e.type==='Miss'?'❌':e.type==='Card'?(e.detail==='Red Card'?'🟥':'🟨'):e.type==='subst'?'🔄':'❓';
+        const playerOut=e.player?.name||'';
+        const playerIn=e.assist?.name||'';
+        const label=e.type==='subst'
+          ?(playerOut&&playerIn?`${playerOut} → ${playerIn}`:playerOut||playerIn||'Bytte')
+          :(e.player?.name||'');
+        const isSubst=e.type==='subst';
+        return`<div style="display:flex;align-items:center;gap:8px;font-size:13px;opacity:${isSubst?'0.65':'1'}">
           <span>${icon}</span>
           <span style="color:var(--text2);font-size:11px;min-width:24px">${e.time?.elapsed||''}'</span>
-          <span style="font-weight:500">${label}</span>
-          <span style="color:var(--text3);font-size:11px">${e.team?.name||''}</span>
+          <span style="font-weight:${isSubst?'400':'500'}">${label}</span>
+          <span style="color:var(--text3);font-size:11px">${isSubst?'':e.team?.name||''}</span>
         </div>`;}).join('')}</div>`:''}
     </div>`;
   }).join('');
