@@ -943,6 +943,11 @@ async function refreshLive(){
     }catch(e){ /* skip this match, retry next interval */ }
   }
   resolveParlays();
+  // Fire one combined celebration for all winners this cycle
+  if(pendingWinCelebrations.length){
+    triggerCelebration(pendingWinCelebrations.map(({bet})=>bet));
+    pendingWinCelebrations=[];
+  }
   renderLiveBox();
   if(currentTab==='tv')renderTVLive();
 }
@@ -1519,6 +1524,7 @@ function getBetDef(mk, betId){
 
 // ─── AUTO-RESOLVE BETS FROM LIVE DATA ───
 let alreadyCelebrated = new Set();
+let pendingWinCelebrations = []; // collected across autoResolveBets + resolveParlays each cycle
 
 function autoResolveBets(mk, score){
   const openBets = Object.entries(bets).filter(([,b])=>b.matchKey===mk&&b.status==='open');
@@ -1553,10 +1559,9 @@ function autoResolveBets(mk, score){
 
   if(Object.keys(upd).length) update(ref(db), upd);
 
-  // Trigger celebration for new wins (batched so multiple wins show together)
+  // Queue new wins — celebration fired once at end of refreshLive cycle
   const newWins=wins.filter(({id})=>!alreadyCelebrated.has(id));
-  newWins.forEach(({id})=>alreadyCelebrated.add(id));
-  if(newWins.length)triggerCelebration(newWins.map(({bet})=>bet));
+  newWins.forEach(({id})=>{alreadyCelebrated.add(id);pendingWinCelebrations.push({id,bet:bets[id]??{}}); });
 }
 
 // ─── CELEBRATION ───
@@ -1913,9 +1918,8 @@ function resolveParlays(){
     else if(allWon){upd[`bets/${id}/status`]='won';wins.push({id,bet});}
   }
   if(Object.keys(upd).length)update(ref(db),upd);
-  const newWins=wins.filter(({id})=>!alreadyCelebrated.has(id));
-  newWins.forEach(({id})=>alreadyCelebrated.add(id));
-  if(newWins.length)triggerCelebration(newWins.map(({bet})=>bet));
+  // Queue — fired combined at end of refreshLive
+  wins.filter(({id})=>!alreadyCelebrated.has(id)).forEach(({id,bet})=>{alreadyCelebrated.add(id);pendingWinCelebrations.push({id,bet});});
 }
 
 function renderBets(){
@@ -2212,6 +2216,19 @@ function renderTVSlurkebet(){
   }).join('');
 }
 
+function getParlayLegStatus(leg){
+  const def=getBetDef(leg.matchKey,leg.betId);
+  const score=liveScores[leg.matchKey];
+  if(!score||score.status==='NS')return'pending';
+  const isFin=score.status==='FT';
+  const s={homeGoals:score.homeGoals,awayGoals:score.awayGoals};
+  const ev=score.events||[];
+  const ht=score.halftime;
+  if(!def?.resolve)return isFin?'lost':'pending';
+  let r; try{r=def.resolve(s,ev,ht,isFin);}catch(e){r=null;}
+  return r===true?'won':r===false?'lost':'pending';
+}
+
 function renderTVBets(){
   const el=document.getElementById('tv-bets-right-content'); if(!el)return;
   const playerOrder=getSorted().map(([id])=>id);
@@ -2230,12 +2247,20 @@ function renderTVBets(){
       <div class="tv-bet-player-name">${avatarEl(p,pid)} ${grp.name}</div>
       ${grp.bets.map(b=>{
         const won=b.status==='won';
+        const legRows=b.isParlay&&b.legs
+          ?b.legs.map(l=>{
+              const st=getParlayLegStatus(l);
+              const col=st==='won'?'var(--green)':st==='lost'?'var(--red)':'var(--text3)';
+              const icon=st==='won'?'✅':st==='lost'?'❌':'⏳';
+              return`<div style="font-size:11px;color:${col};margin-bottom:2px">${icon} ${l.desc} <span style="color:var(--text3)">(${l.odds}×)</span></div>`;
+            }).join('')
+          :'';
         return`<div class="tv-bet-row${won?' won':''}">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
-            <span style="font-size:10px;color:var(--text2)">${b.matchLabel||''}</span>
+            <span style="font-size:10px;color:var(--text2)">${b.isParlay?'🔗 Parlay':b.matchLabel||''}</span>
             <span style="font-size:12px;font-weight:700;color:${won?'var(--green)':'var(--amber)'}">${b.odds}×${won?' 🎉':''}</span>
           </div>
-          <div style="font-size:12px;font-weight:500;margin-bottom:2px">${b.desc}</div>
+          ${legRows||`<div style="font-size:12px;font-weight:500;margin-bottom:2px">${b.desc}</div>`}
           <div style="font-size:11px;color:var(--text2)">🎯${b.stake} → 🏆${b.payout}${won?` <strong style="color:var(--green)">TREFF!</strong>`:''}</div>
         </div>`;
       }).join('')}
