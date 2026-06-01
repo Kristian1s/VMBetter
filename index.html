@@ -138,9 +138,15 @@ select option{background:var(--bg3)}
 
 /* ═══════════════════ TV VIEW ═══════════════════ */
 #tab-tv{display:none}
-#tab-tv.active{display:grid;grid-template-columns:1fr 1fr 320px;grid-template-rows:auto 1fr;gap:14px;max-width:none;margin:0 auto;padding:1.25rem}
+#tab-tv.active{display:grid;grid-template-columns:1fr 1fr 320px;grid-template-rows:auto 1fr auto;gap:14px;height:100%;max-width:none;margin:0 auto;padding:1.25rem;box-sizing:border-box}
 @media(min-width:900px){#tab-tv.active{display:grid}}
-.tv-col-scroll{overflow-y:auto;max-height:calc(100vh - 100px)}
+.tv-col-scroll{overflow-y:auto;}
+
+/* BET TICKER */
+.tv-ticker{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+.tv-ticker-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:8px 10px;min-width:0;overflow:hidden;transition:border-color .3s}
+.tv-ticker-card.new{animation:tickerIn .4s cubic-bezier(.22,1,.36,1)}
+@keyframes tickerIn{from{opacity:0;transform:translateY(-8px) scale(.97)}to{opacity:1;transform:none}}
 /* Compact TV podiums */
 .podium-sm{padding:.6rem .5rem 0}
 .podium-sm .podium-headline{font-size:14px;margin-bottom:.5rem}
@@ -389,6 +395,12 @@ select option{background:var(--bg3)}
       <div id="tv-bets-right-content"></div>
     </div>
 
+    <!-- ROW 3: Bet ticker — spans all columns -->
+    <div class="tv-card" style="grid-column:1/4;grid-row:3;padding:.75rem 1rem">
+      <div class="tv-title" style="margin-bottom:.6rem;font-size:14px">🎯 SISTE BETS</div>
+      <div id="tv-ticker" class="tv-ticker"></div>
+    </div>
+
   </div>
 
 </div>
@@ -486,8 +498,8 @@ window.showTab=function(id){
   document.getElementById('tab-'+id).classList.add('active');
   ['spillere','tipping','betting','tv'].forEach((t,i)=>{ const el=document.querySelectorAll('.tab')[i]; if(el)el.classList.toggle('active',t===id); });
   const mw=document.getElementById('main-wrap');
-  if(id==='tv'){ mw.style.maxWidth='none'; mw.style.padding='0'; }
-  else{ mw.style.maxWidth=''; mw.style.padding=''; }
+  if(id==='tv'){ mw.style.maxWidth='none'; mw.style.padding='0'; mw.style.height='calc(100vh - 62px)'; }
+  else{ mw.style.maxWidth=''; mw.style.padding=''; mw.style.height=''; }
   if(id==='spillere')renderPlayers();
   if(id==='tipping'){ renderPlayerSelects(); renderLiveBox(); renderMatchButtons(); }
   if(id==='betting'){ renderBets(); renderBetCatalog(); renderMatchButtons(); }
@@ -1998,7 +2010,48 @@ function renderScore(){
 }
 
 // ─── TV VIEW ───
-function renderTV(){ renderTVPodium(); renderTVSlurkebet(); renderTVTips(); renderTVLive(); renderTVBets(); }
+function renderTV(){ renderTVPodium(); renderTVSlurkebet(); renderTVTips(); renderTVLive(); renderTVBets(); renderTVTicker(); }
+
+let tvTickerKnownIds=new Set();
+function renderTVTicker(){
+  const el=document.getElementById('tv-ticker'); if(!el)return;
+  // Newest first, max 18 (6 cols × 3 rows)
+  const sorted=Object.entries(bets)
+    .sort(([,a],[,b])=>(b.createdAt||0)-(a.createdAt||0))
+    .slice(0,18);
+  if(!sorted.length){
+    el.innerHTML='<div style="color:var(--text3);font-size:13px;grid-column:1/-1;text-align:center;padding:.5rem">Ingen bets plassert ennå</div>';
+    return;
+  }
+  const newIds=new Set(sorted.filter(([id])=>!tvTickerKnownIds.has(id)).map(([id])=>id));
+  el.innerHTML=sorted.map(([id,b])=>{
+    const won=b.status==='won', lost=b.status==='lost';
+    const borderCol=won?'var(--green)':lost?'var(--red)':'var(--border)';
+    const oddsCol=won?'var(--green)':lost?'var(--red)':'var(--amber)';
+    const statusIcon=won?' 🎉':lost?' ❌':'';
+    // For parlays show first keyword of each leg to keep it compact
+    const descText=b.isParlay&&b.legs
+      ?'🔗 '+b.legs.map(l=>l.desc.split(' ').slice(0,2).join(' ')).join(' + ')
+      :b.desc;
+    // Parlay leg colour indicators
+    const legDots=b.isParlay&&b.legs
+      ?`<div style="display:flex;gap:3px;margin-top:2px;flex-wrap:wrap">${b.legs.map(l=>{
+          const st=getParlayLegStatus(l);
+          return`<span style="font-size:10px;color:${st==='won'?'var(--green)':st==='lost'?'var(--red)':'var(--text3)'}">${st==='won'?'✅':st==='lost'?'❌':'⏳'}</span>`;
+        }).join('')}</div>`
+      :'';
+    return`<div class="tv-ticker-card${newIds.has(id)?' new':''}" style="border-color:${borderCol}">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;margin-bottom:2px">
+        <span style="font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${b.placerName}</span>
+        <span style="font-size:11px;font-weight:700;color:${oddsCol};flex-shrink:0">${b.odds}×${statusIcon}</span>
+      </div>
+      <div style="font-size:10px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${descText}</div>
+      ${legDots}
+      <div style="font-size:10px;color:var(--text3);margin-top:2px">🎯${b.stake} → 🏆<strong style="color:${won?'var(--green)':'var(--text)'}">${b.payout}</strong></div>
+    </div>`;
+  }).join('');
+  sorted.forEach(([id])=>tvTickerKnownIds.add(id));
+}
 
 function miiHTML(p, id, spotClass){
   const hasImg=p&&p.avatar&&p.avatar.startsWith('data:');
