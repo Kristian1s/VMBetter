@@ -261,7 +261,7 @@ select option{background:var(--bg3)}
   <div class="tabs">
     <button class="tab active" onclick="showTab('spillere')">Min oversikt</button>
     <button class="tab" onclick="showTab('tipping')">🏆 Tippekonk</button>
-    <button class="tab" onclick="showTab('betting')">🍻 Slurkebet™</button>
+    <button class="tab" onclick="showTab('betting')">🃏 Bookern</button>
     <button class="tab tab-tv" onclick="showTab('tv')">📺 Storskjerm</button>
   </div>
 </header>
@@ -297,7 +297,7 @@ select option{background:var(--bg3)}
 
   <!-- ===== BETTING ===== -->
   <div class="section" id="tab-betting">
-    <div class="section-title">Slurkebet™</div>
+    <div class="section-title">Bookern</div>
 
     <!-- Step 1: pick match -->
     <div class="card">
@@ -319,13 +319,34 @@ select option{background:var(--bg3)}
           <select id="bet-placer-sel" onchange="updateBudgetDisplay()"><option value="">Velg spiller...</option></select>
           <div id="budget-display" style="font-size:12px;color:var(--text2);margin-top:6px"></div>
         </div>
-        <div class="field"><label>Innsats (slurker du drikker NÅ)</label>
-          <input type="number" id="bet-stake" min="1" max="20" value="2">
+        <div class="field"><label>Innsats (maks 10 tokens)</label>
+          <input type="number" id="bet-stake" min="1" max="10" value="2">
         </div>
         <div id="bet-payout-preview" style="font-size:13px;color:var(--text2);margin-bottom:12px"></div>
         <div style="display:flex;gap:8px">
-          <button class="btn btn-primary" style="flex:1" onclick="confirmBet()">Drikk & plasser 🍺</button>
+          <button class="btn btn-primary" style="flex:1" onclick="confirmBet()">Plasser bet 🎯</button>
           <button class="btn" onclick="cancelBet()">Avbryt</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Parlay builder -->
+    <div id="parlay-builder-panel" style="display:none">
+      <div class="card" style="border-color:var(--blue)">
+        <div class="card-label">🔗 Parlay</div>
+        <div id="parlay-legs-list" style="margin-bottom:10px"></div>
+        <div id="parlay-combined-odds" style="font-size:15px;color:var(--amber);font-weight:600;margin-bottom:12px"></div>
+        <div class="field"><label>Hvem vedder?</label>
+          <select id="parlay-placer-sel" onchange="updateParlayPreview()"><option value="">Velg spiller...</option></select>
+          <div id="parlay-budget-display" style="font-size:12px;color:var(--text2);margin-top:6px"></div>
+        </div>
+        <div class="field"><label>Innsats (maks 10 tokens)</label>
+          <input type="number" id="parlay-stake" min="1" max="10" value="3" oninput="updateParlayPreview()">
+        </div>
+        <div id="parlay-payout-preview" style="font-size:13px;color:var(--text2);margin-bottom:12px"></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary" style="flex:1" onclick="confirmParlay()">Plasser parlay 🔗</button>
+          <button class="btn" onclick="cancelParlay()">Avbryt</button>
         </div>
       </div>
     </div>
@@ -344,9 +365,9 @@ select option{background:var(--bg3)}
       <div class="podium-stage" id="podium-stage"></div>
     </div>
 
-    <!-- COL 2 TOP: Slurkebet podium (compact) -->
+    <!-- COL 2 TOP: Bookern podium (compact) -->
     <div class="podium-wrap tv-card podium-sm" id="tv-slurkebet-podium" style="grid-column:2;grid-row:1">
-      <div class="podium-headline">SLURKEBET<span style="font-size:.5em;vertical-align:super">™</span> 🍺</div>
+      <div class="podium-headline">BOOKERN 🃏</div>
       <div class="podium-stage" id="slurkebet-podium-stage"></div>
     </div>
 
@@ -362,7 +383,7 @@ select option{background:var(--bg3)}
       <div id="tv-tips"></div>
     </div>
 
-    <!-- COL 2 BOTTOM: Slurkebet bets -->
+    <!-- COL 2 BOTTOM: Bookern bets -->
     <div class="tv-card tv-col-scroll" id="tv-bets-right" style="grid-column:2;grid-row:2">
       <div class="tv-title">🍻 SLURKEBET™</div>
       <div id="tv-bets-right-content"></div>
@@ -408,7 +429,8 @@ const RAPID_KEY = "86b71ea67bmsh076351ff0c7fb59p12fb39jsnb660034bd93f";
 let MATCHES = {};   // populated from Firebase config/matches
 let BET_CATALOG = {}; // generated from MATCHES via generateBetCatalog()
 
-const MAX_SLURK_BUDGET = 10;
+const TOKEN_BUDGET = 20;
+const MAX_SINGLE_STAKE = 10;
 
 // Match-specific player scorer bonuses — keyed by match key
 const MATCH_PLAYER_BETS = {
@@ -420,9 +442,9 @@ const MATCH_PLAYER_BETS = {
     { field:'mane',   label:'Sadio Mané scorer?', prefix:'mne', abbr:'MNE', names:['mane','mané','sadio'] }
   ]
 };
-function getSlurkerSpent(pid){ return Object.values(bets).filter(b=>b.placerId===pid).reduce((s,b)=>s+(b.stake||0),0); }
-function getSlurkerWon(pid){ return Object.values(bets).filter(b=>b.placerId===pid&&b.status==='won').reduce((s,b)=>s+(b.payout||0),0); }
-function getRemainingBudget(pid){ return pid?Math.max(0,MAX_SLURK_BUDGET-getSlurkerSpent(pid)):MAX_SLURK_BUDGET; }
+function getTokensSpent(pid){ return Object.values(bets).filter(b=>b.placerId===pid).reduce((s,b)=>s+(b.stake||0),0); }
+function getTokensWon(pid){ return Object.values(bets).filter(b=>b.placerId===pid&&b.status==='won').reduce((s,b)=>s+(b.payout||0),0); }
+function getRemainingTokens(pid){ return pid?Math.max(0,TOKEN_BUDGET-getTokensSpent(pid)):TOKEN_BUDGET; }
 
 let players={}, bets={}, tips={};
 let selectedBettors=new Set();
@@ -626,10 +648,10 @@ function renderMyOverview(){
   const myBets=Object.entries(bets).filter(([,b])=>b.placerId===devicePlayerId);
   const tipPts=getLiveTipPoints(devicePlayerId);
   const sip=p.sipScore||0; const tot=tipPts+sip;
-  const spent=getSlurkerSpent(devicePlayerId);
-  const wonSlurk=getSlurkerWon(devicePlayerId);
-  const remaining=getRemainingBudget(devicePlayerId);
-  const budgetPct=Math.min(100,Math.round((spent/MAX_SLURK_BUDGET)*100));
+  const spent=getTokensSpent(devicePlayerId);
+  const wonSlurk=getTokensWon(devicePlayerId);
+  const remaining=getRemainingTokens(devicePlayerId);
+  const budgetPct=Math.min(100,Math.round((spent/TOKEN_BUDGET)*100));
 
   let html=`
     <div class="card">
@@ -646,11 +668,11 @@ function renderMyOverview(){
       </div>
     </div>
     <div class="card">
-      <div class="card-label">Slurkebet™ budget</div>
+      <div class="card-label">Bookern — tokens</div>
       <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text2);margin-bottom:8px">
-        <span>Brukt: <strong style="color:var(--text)">${spent}/${MAX_SLURK_BUDGET}</strong></span>
+        <span>Brukt: <strong style="color:var(--text)">${spent}/${TOKEN_BUDGET}</strong></span>
         <span>Vunnet: <strong style="color:var(--green)">+${wonSlurk}</strong></span>
-        <span>Gjenstår: <strong style="color:${remaining<=5?'var(--red)':remaining<=10?'var(--amber)':'var(--green)'}">${remaining}</strong></span>
+        <span>Gjenstår: <strong style="color:${remaining<=4?'var(--red)':remaining<=10?'var(--amber)':'var(--green)'}">${remaining}</strong></span>
       </div>
       <div style="background:var(--bg3);border-radius:6px;height:8px;overflow:hidden">
         <div style="width:${budgetPct}%;background:var(--amber);height:100%;border-radius:6px;transition:width .3s"></div>
@@ -678,7 +700,7 @@ function renderMyOverview(){
   }
 
   if(myBets.length){
-    html+=`<div class="card"><div class="card-label">Mine slurkebet</div>`;
+    html+=`<div class="card"><div class="card-label">Mine bets — Bookern</div>`;
     myBets.forEach(([,b])=>{
       const sc=b.status==='won'?'var(--green)':b.status==='lost'?'var(--red)':'var(--amber)';
       const sl=b.status==='won'?'🎉 TREFF':b.status==='lost'?'❌ Bom':'⏳ Åpen';
@@ -688,7 +710,7 @@ function renderMyOverview(){
           <span style="font-size:12px;font-weight:600;color:${sc}">${sl}</span>
         </div>
         <div style="font-size:14px;font-weight:500">${b.desc}</div>
-        <div style="font-size:12px;color:var(--text2);margin-top:2px">🍺 ${b.stake} inn → 🎉 ${b.payout} ut${b.status==='won'?` <strong style="color:var(--green)">· Del ut ${b.payout}!</strong>`:''}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px">🎯 ${b.stake} → 🏆 ${b.payout} tokens${b.status==='won'?` <strong style="color:var(--green)">TREFF!</strong>`:''}</div>
       </div>`;
     });
     html+=`</div>`;
@@ -920,6 +942,7 @@ async function refreshLive(){
       }
     }catch(e){ /* skip this match, retry next interval */ }
   }
+  resolveParlays();
   renderLiveBox();
   if(currentTab==='tv')renderTVLive();
 }
@@ -1296,8 +1319,20 @@ function generateBetCatalog(mk, home, away, homeKey, awayKey){
 }
 function rebuildBetCatalogs(){
   BET_CATALOG={};
-  for(const[mk,m]of Object.entries(MATCHES))
-    BET_CATALOG[mk]=generateBetCatalog(mk,m.home,m.away,m.homeKey,m.awayKey);
+  for(const[mk,m]of Object.entries(MATCHES)){
+    const catalog=generateBetCatalog(mk,m.home,m.away,m.homeKey,m.awayKey);
+    const playerBets=(MATCH_PLAYER_BETS[mk]||[]).map(pb=>({
+      id:`player-${pb.field}`,
+      text:`${pb.label.replace('?','')} i kampen`,
+      odds:pb.field==='haaland'?1.6:pb.field==='mbappe'?1.8:3.5,
+      resolve:(s,ev,ht,fin)=>{
+        const scored=goalEvents(ev).some(e=>pb.names.some(n=>e.player?.name?.toLowerCase().includes(n)));
+        return scored?true:fin?false:null;
+      }
+    }));
+    if(playerBets.length) catalog.categories.push({icon:'⭐',label:'Spillere',bets:playerBets});
+    BET_CATALOG[mk]=catalog;
+  }
 }
 function renderMatchButtons(){
   const list=Object.entries(MATCHES);
@@ -1542,8 +1577,8 @@ function triggerCelebration(bets){
     :first.desc;
   document.getElementById('celeb-placer').textContent=`${placers} vinner!`;
   document.getElementById('celeb-payout').textContent=multi
-    ?`🍺 Del ut totalt ${totalPayout} slurker!`
-    :`🍺 Del ut ${first.payout} slurker!`;
+    ?`🏆 Totalt ${totalPayout} tokens vunnet!`
+    :`🏆 ${first.payout} tokens vunnet!`;
   spawnConfetti();
   el.classList.add('show');
   setTimeout(()=>el.classList.remove('show'),6000);
@@ -1562,6 +1597,8 @@ function spawnConfetti(){
 }
 
 let pendingBet = null;
+let parlayMode = false;
+let parlayLegs = []; // [{matchKey, betId, desc, odds}]
 
 window.selectBetMatch=function(mk){
   selectedBetMatch=mk;
@@ -1641,7 +1678,7 @@ window.renderBetCatalog = function(){
     el.innerHTML=`<div class="card" style="border-color:${done?'var(--green)':'var(--red)'}">
       <div style="display:flex;align-items:center;gap:10px">
         <span style="font-size:22px">${done?'✅':'🔒'}</span>
-        <div style="flex:1"><div style="font-weight:600">${done?'Kamp ferdig':'Kampen er i gang – Slurkebet stengt!'}</div>
+        <div style="flex:1"><div style="font-weight:600">${done?'Kamp ferdig':'Kampen er i gang – Bookern stengt!'}</div>
         <div style="font-size:12px;color:var(--text2)">Ingen nye bets kan plasseres</div></div>
         <div style="font-family:'Bebas Neue',sans-serif;font-size:28px">${score.homeGoals} – ${score.awayGoals}</div>
       </div></div>`;
@@ -1657,7 +1694,13 @@ window.renderBetCatalog = function(){
   const wonIds=new Set(Object.values(bets).filter(b=>b.matchKey===mk&&b.status==='won').map(b=>b.betId));
   const lostIds=new Set(Object.values(bets).filter(b=>b.matchKey===mk&&b.status==='lost').map(b=>b.betId));
 
-  el.innerHTML = catalog.categories.map(cat=>{
+  const parlayToggle=`<div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+    <button class="btn btn-sm${parlayMode?' btn-primary':''}" onclick="toggleParlayMode()">
+      🔗 ${parlayMode?`Avslutt parlay (${parlayLegs.length} ben)`:'Kombiner → Parlay'}
+    </button>
+  </div>`;
+
+  el.innerHTML = parlayToggle + catalog.categories.map(cat=>{
     const items=cat.bets.map(b=>{
       if(wonIds.has(b.id)||lostIds.has(b.id))return'';
       const placers=placersByBetId[b.id]||[];
@@ -1667,12 +1710,14 @@ window.renderBetCatalog = function(){
         ?`<span class="odds-badge" style="background:${live.dir==='down'?'var(--green-light)':'var(--red-light)'}; color:${live.dir==='down'?'var(--green)':'var(--red)'}">${oddsDisplay}× ${live.dir==='down'?'↓':'↑'}</span>`
         :`<span class="odds-badge">${oddsDisplay}×</span>`;
       const tag=placers.length?`<span style="color:var(--green);font-size:12px">✓ ${placers.join(', ')}</span>`:'';
-      return`<div class="bet-item${placers.length?' already-placed':''}" onclick="selectBet('${mk}','${b.id}')">
-        <div class="bet-item-text">${b.text} ${tag}</div>
+      const inParlay=parlayLegs.some(l=>l.matchKey===mk&&l.betId===b.id);
+      const parlayCheck=parlayMode?`<span style="font-size:18px;margin-right:6px;flex-shrink:0">${inParlay?'✅':'⬜'}</span>`:'';
+      return`<div class="bet-item${(placers.length||inParlay)?' already-placed':''}" onclick="${parlayMode?`addToParlay('${mk}','${b.id}')`:`selectBet('${mk}','${b.id}')`}">
+        ${parlayCheck}<div class="bet-item-text">${b.text} ${tag}</div>
         <div class="bet-item-odds">${oddsTag}</div>
       </div>`;
     }).join('');
-    if(!items.trim())return''; // hide category if all bets resolved
+    if(!items.trim())return'';
     return`<div class="cat-section"><div class="cat-header">${cat.icon} ${cat.label}</div>${items}</div>`;
   }).join('');
 };
@@ -1698,15 +1743,15 @@ window.updateBudgetDisplay = function(){
   const stakeEl = document.getElementById('bet-stake');
   if(!el||!stakeEl) return;
   if(pid){
-    const remaining = getRemainingBudget(pid);
-    const spent = getSlurkerSpent(pid);
-    const color = remaining<=5?'var(--red)':remaining<=10?'var(--amber)':'var(--green)';
-    el.innerHTML = `Budget: <strong style="color:${color}">${remaining}</strong> / ${MAX_SLURK_BUDGET} slurker gjenstående (brukt: ${spent})`;
-    stakeEl.max = remaining;
-    if(parseInt(stakeEl.value)>remaining) stakeEl.value = Math.max(1,remaining);
+    const remaining = getRemainingTokens(pid);
+    const spent = getTokensSpent(pid);
+    const color = remaining<=4?'var(--red)':remaining<=10?'var(--amber)':'var(--green)';
+    el.innerHTML = `Tokens: <strong style="color:${color}">${remaining}</strong> / ${TOKEN_BUDGET} gjenstående (brukt: ${spent})`;
+    stakeEl.max = Math.min(MAX_SINGLE_STAKE, remaining);
+    if(parseInt(stakeEl.value)>remaining) stakeEl.value = Math.max(1,Math.min(MAX_SINGLE_STAKE,remaining));
   } else {
     el.innerHTML = '';
-    stakeEl.max = MAX_SLURK_BUDGET;
+    stakeEl.max = MAX_SINGLE_STAKE;
   }
   updatePayoutPreview();
 };
@@ -1714,7 +1759,7 @@ window.updatePayoutPreview = function(){
   const stake = parseInt(document.getElementById('bet-stake').value)||0;
   const payout = Math.round(stake*(pendingBet?.odds||1));
   document.getElementById('bet-payout-preview').innerHTML =
-    `Du drikker <strong style="color:var(--red)">${stake} slurk${stake!==1?'er':''}</strong> nå → vinner du deler du ut <strong style="color:var(--green)">${payout} slurk${payout!==1?'er':''}</strong>`;
+    `${stake} token${stake!==1?'s':''} inn → vinner du <strong style="color:var(--green)">${payout} token${payout!==1?'s':''}</strong>`;
 };
 document.addEventListener('input', e=>{ if(e.target.id==='bet-stake') updatePayoutPreview(); });
 
@@ -1724,9 +1769,10 @@ window.confirmBet = function(){
   const pid = document.getElementById('bet-placer-sel').value;
   const stake = parseInt(document.getElementById('bet-stake').value)||0;
   if(!pid){ showToast('Velg spiller!'); return; }
-  if(stake<1){ showToast('Minst 1 slurk!'); return; }
-  const remaining = getRemainingBudget(pid);
-  if(stake>remaining){ showToast(`${players[pid]?.name||'Spiller'} har bare ${remaining} slurker igjen!`); return; }
+  if(stake<1){ showToast('Minst 1 token!'); return; }
+  if(stake>MAX_SINGLE_STAKE){ showToast(`Maks ${MAX_SINGLE_STAKE} tokens per bet!`); return; }
+  const remaining = getRemainingTokens(pid);
+  if(stake>remaining){ showToast(`${players[pid]?.name||'Spiller'} har bare ${remaining} tokens igjen!`); return; }
   const payout = Math.round(stake * pendingBet.odds);
   saveDeviceMapping(pid);
   push(ref(db,'bets'),{
@@ -1737,24 +1783,159 @@ window.confirmBet = function(){
   });
   document.getElementById('bet-place-panel').style.display='none';
   pendingBet=null;
-  showToast(`Bet plassert! Drikk ${stake} slurker nå 🍺`);
+  showToast(`Bet plassert! ${stake} token${stake!==1?'s':''} satset 🎯`);
   renderBetCatalog(); renderBets();
 };
 window.cancelBet=function(){ document.getElementById('bet-place-panel').style.display='none'; pendingBet=null; };
 
+// ─── PARLAY SYSTEM ───
+window.toggleParlayMode=function(){
+  parlayMode=!parlayMode;
+  if(!parlayMode){ parlayLegs=[]; document.getElementById('parlay-builder-panel').style.display='none'; }
+  document.getElementById('bet-place-panel').style.display='none'; pendingBet=null;
+  renderBetCatalog();
+};
+
+window.addToParlay=function(mk, betId){
+  const def=getBetDef(mk,betId); if(!def)return;
+  const idx=parlayLegs.findIndex(l=>l.matchKey===mk&&l.betId===betId);
+  if(idx>=0) parlayLegs.splice(idx,1);
+  else parlayLegs.push({matchKey:mk,betId,desc:def.text,odds:def.odds});
+  renderParlayBuilder();
+  renderBetCatalog();
+};
+
+function renderParlayBuilder(){
+  const panel=document.getElementById('parlay-builder-panel'); if(!panel)return;
+  if(!parlayMode||!parlayLegs.length){ panel.style.display='none'; return; }
+  const combinedOdds=parseFloat(parlayLegs.reduce((a,l)=>a*l.odds,1).toFixed(2));
+  document.getElementById('parlay-legs-list').innerHTML=parlayLegs.map(l=>
+    `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:13px">
+      <span>${l.desc}</span><span style="color:var(--amber);font-weight:600">${l.odds}×</span>
+    </div>`).join('');
+  document.getElementById('parlay-combined-odds').textContent=`Kombinert odds: ${combinedOdds}×`;
+  const sel=document.getElementById('parlay-placer-sel');
+  const cur=sel.value||devicePlayerId;
+  const oh=sel.onchange; sel.onchange=null;
+  sel.innerHTML='<option value="">Velg spiller...</option>'+Object.entries(players).map(([id,p])=>`<option value="${id}">${p.name}</option>`).join('');
+  if(cur)sel.value=cur;
+  sel.onchange=oh;
+  updateParlayPreview();
+  panel.style.display='block';
+}
+
+window.updateParlayPreview=function(){
+  const pid=document.getElementById('parlay-placer-sel')?.value;
+  const stakeEl=document.getElementById('parlay-stake');
+  const budgetEl=document.getElementById('parlay-budget-display');
+  const previewEl=document.getElementById('parlay-payout-preview');
+  if(!stakeEl||!previewEl)return;
+  if(pid){
+    const rem=getRemainingTokens(pid);
+    const color=rem<=4?'var(--red)':rem<=10?'var(--amber)':'var(--green)';
+    if(budgetEl)budgetEl.innerHTML=`Tokens: <strong style="color:${color}">${rem}</strong> / ${TOKEN_BUDGET} gjenstående`;
+    stakeEl.max=Math.min(MAX_SINGLE_STAKE,rem);
+    if(parseInt(stakeEl.value)>rem)stakeEl.value=Math.max(1,Math.min(MAX_SINGLE_STAKE,rem));
+  } else {
+    if(budgetEl)budgetEl.innerHTML='';
+    stakeEl.max=MAX_SINGLE_STAKE;
+  }
+  const stake=parseInt(stakeEl.value)||0;
+  const combinedOdds=parseFloat(parlayLegs.reduce((a,l)=>a*l.odds,1).toFixed(2));
+  const payout=Math.round(stake*combinedOdds);
+  previewEl.innerHTML=`${stake} token${stake!==1?'s':''} inn → vinner du <strong style="color:var(--green)">${payout} token${payout!==1?'s':''}</strong>`;
+};
+
+window.confirmParlay=function(){
+  if(!parlayLegs.length)return;
+  for(const leg of parlayLegs){
+    if(liveScores[leg.matchKey]?.status==='FT'){showToast(`${leg.matchKey} er allerede ferdig!`);return;}
+  }
+  const pid=document.getElementById('parlay-placer-sel').value;
+  const stake=parseInt(document.getElementById('parlay-stake').value)||0;
+  if(!pid){showToast('Velg spiller!');return;}
+  if(stake<1){showToast('Minst 1 token!');return;}
+  if(stake>MAX_SINGLE_STAKE){showToast(`Maks ${MAX_SINGLE_STAKE} tokens per bet!`);return;}
+  const rem=getRemainingTokens(pid);
+  if(stake>rem){showToast(`${players[pid]?.name||''} har bare ${rem} tokens igjen!`);return;}
+  const combinedOdds=parseFloat(parlayLegs.reduce((a,l)=>a*l.odds,1).toFixed(2));
+  const payout=Math.round(stake*combinedOdds);
+  const legCount=parlayLegs.length;
+  saveDeviceMapping(pid);
+  push(ref(db,'bets'),{
+    isParlay:true,
+    legs:parlayLegs.map(l=>({matchKey:l.matchKey,betId:l.betId,desc:l.desc,odds:l.odds})),
+    matchKey:parlayLegs[0].matchKey,
+    matchLabel:parlayLegs.map(l=>getTeamAbbr(MATCHES[l.matchKey]?.home||'')+'+'+getTeamAbbr(MATCHES[l.matchKey]?.away||'')).join('/'),
+    betId:'parlay_'+Date.now(),
+    desc:parlayLegs.map(l=>l.desc).join(' + '),
+    odds:combinedOdds, stake, payout,
+    placerId:pid, placerName:players[pid]?.name||'',
+    status:'open', createdAt:Date.now()
+  });
+  parlayLegs=[];
+  parlayMode=false;
+  document.getElementById('parlay-builder-panel').style.display='none';
+  showToast(`Parlay plassert! ${legCount} ben, odds ${combinedOdds}× 🔗`);
+  renderBetCatalog(); renderBets();
+};
+
+window.cancelParlay=function(){
+  parlayLegs=[];
+  parlayMode=false;
+  document.getElementById('parlay-builder-panel').style.display='none';
+  renderBetCatalog();
+};
+
+// Resolve all open parlays — called each refresh cycle
+function resolveParlays(){
+  const openParlays=Object.entries(bets).filter(([,b])=>b.isParlay&&b.status==='open'&&b.legs);
+  if(!openParlays.length)return;
+  const upd={};
+  const wins=[];
+  for(const[id,bet]of openParlays){
+    let allWon=true, anyLost=false;
+    for(const leg of bet.legs){
+      const def=getBetDef(leg.matchKey,leg.betId);
+      const score=liveScores[leg.matchKey];
+      if(!score||score.status==='NS'){allWon=false;continue;}
+      const isFin=score.status==='FT';
+      const s={homeGoals:score.homeGoals,awayGoals:score.awayGoals};
+      const ev=score.events||[];
+      const ht=score.halftime;
+      if(!def?.resolve){if(isFin){anyLost=true;break;}allWon=false;continue;}
+      let result;
+      try{result=def.resolve(s,ev,ht,isFin);}catch(e){result=null;}
+      if(result===false){anyLost=true;break;}
+      if(result!==true)allWon=false;
+    }
+    if(anyLost)upd[`bets/${id}/status`]='lost';
+    else if(allWon){upd[`bets/${id}/status`]='won';wins.push({id,bet});}
+  }
+  if(Object.keys(upd).length)update(ref(db),upd);
+  const newWins=wins.filter(({id})=>!alreadyCelebrated.has(id));
+  newWins.forEach(({id})=>alreadyCelebrated.add(id));
+  if(newWins.length)triggerCelebration(newWins.map(({bet})=>bet));
+}
+
 function renderBets(){
   const el=document.getElementById('bets-list');
   const open=Object.entries(bets).filter(([,b])=>b.status==='open');
-  if(!open.length){ el.innerHTML='<div class="empty">Ingen aktive veddemål 🍺</div>'; return; }
+  if(!open.length){ el.innerHTML='<div class="empty">Ingen aktive bets ennå</div>'; return; }
   el.innerHTML=open.map(([id,b])=>`
     <div class="bet-card">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px">
-        <div><span class="badge badge-open">Åpen</span>${b.matchLabel?` <span style="font-size:12px;color:var(--text2)">${b.matchLabel}</span>`:''}</div>
+        <div>
+          ${b.isParlay?'<span class="badge" style="background:var(--blue-light);color:var(--blue)">Parlay</span>':'<span class="badge badge-open">Åpen</span>'}
+          ${b.matchLabel?` <span style="font-size:12px;color:var(--text2)">${b.matchLabel}</span>`:''}
+        </div>
         <span class="sip-badge">${b.odds}×</span>
       </div>
-      <div style="font-size:15px;font-weight:500;margin-bottom:4px">${b.desc}</div>
+      ${b.isParlay&&b.legs
+        ?b.legs.map(l=>`<div style="font-size:12px;color:var(--text2);margin-bottom:2px">• ${l.desc} (${l.odds}×)</div>`).join('')
+        :`<div style="font-size:15px;font-weight:500;margin-bottom:4px">${b.desc}</div>`}
       <div style="font-size:13px;color:var(--text2);margin-bottom:${isAdmin()?'10px':'0'}">
-        <span style="color:var(--text)">${b.placerName}</span> · 🍺${b.stake} inn → 🎉${b.payout} ut
+        <span style="color:var(--text)">${b.placerName}</span> · 🎯 ${b.stake} → 🏆 ${b.payout} tokens
       </div>
       ${isAdmin()?`<div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-sm btn-red" onclick="deleteBet('${id}')">🗑️ Slett bet</button>
@@ -1925,8 +2106,8 @@ window.showBreakdown=function(playerId){
 
   // Slurker
   rows+=`<div class="breakdown-row">
-    <span class="breakdown-label">🍺 Slurker (netto)</span>
-    <span class="breakdown-pts ${sip>=0?'hit':'miss'}">${sip>=0?'+':''}${sip} slurk${Math.abs(sip)!==1?'er':''}</span>
+    <span class="breakdown-label">🃏 Bookern (netto tokens)</span>
+    <span class="breakdown-pts ${sip>=0?'hit':'miss'}">${sip>=0?'+':''}${sip} token${Math.abs(sip)!==1?'s':''}</span>
   </div>`;
 
   // Total
@@ -2013,7 +2194,7 @@ function renderTVLive(){
 function renderTVSlurkebet(){
   const stage = document.getElementById('slurkebet-podium-stage'); if(!stage)return;
   const list = Object.entries(players).map(([id,p])=>{
-    return [id, p, getSlurkerWon(id), getSlurkerSpent(id)];
+    return [id, p, getTokensWon(id), getTokensSpent(id)];
   }).sort((a,b)=>b[2]-a[2]);
 
   const spots=[{rank:2,spot:'spot-2',idx:1},{rank:1,spot:'spot-1',idx:0},{rank:3,spot:'spot-3',idx:2}];
@@ -2024,8 +2205,8 @@ function renderTVSlurkebet(){
     return`<div class="podium-spot ${spot}">
       ${miiHTML(p,id,spot)}
       <div class="mii-label">${p.name}</div>
-      <div class="mii-pts">🍺 +${won} slurker vunnet</div>
-      <div style="font-size:11px;color:var(--text3);text-align:center;margin-bottom:4px">${MAX_SLURK_BUDGET-spent} igjen av ${MAX_SLURK_BUDGET}</div>
+      <div class="mii-pts">🎯 +${won} tokens</div>
+      <div style="font-size:11px;color:var(--text3);text-align:center;margin-bottom:4px">${TOKEN_BUDGET-spent} av ${TOKEN_BUDGET} igjen</div>
       <div class="podium-block"><span class="podium-num">${rank}</span></div>
     </div>`;
   }).join('');
@@ -2055,7 +2236,7 @@ function renderTVBets(){
             <span style="font-size:12px;font-weight:700;color:${won?'var(--green)':'var(--amber)'}">${b.odds}×${won?' 🎉':''}</span>
           </div>
           <div style="font-size:12px;font-weight:500;margin-bottom:2px">${b.desc}</div>
-          <div style="font-size:11px;color:var(--text2)">🍺${b.stake} → 🎉${b.payout}${won?` <strong style="color:var(--green)">TREFF!</strong>`:''}</div>
+          <div style="font-size:11px;color:var(--text2)">🎯${b.stake} → 🏆${b.payout}${won?` <strong style="color:var(--green)">TREFF!</strong>`:''}</div>
         </div>`;
       }).join('')}
     </div>`;
