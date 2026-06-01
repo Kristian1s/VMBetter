@@ -425,6 +425,7 @@ let devicePlayerId=null;
 let deviceIp=null;
 let matchClocks={};
 let knownEventKeys={};
+let seededMatches=new Set(); // matches whose existing events have been silently seeded on first load
 let bannerTimer;
 
 function isAdmin(){ return window.innerWidth>=900; }
@@ -694,8 +695,12 @@ window.addSelf=function(){
 function renderPlayerSelects(){
   const sel=document.getElementById('tip-player-select'); if(!sel)return;
   const cur=sel.value||devicePlayerId;
+  // Suppress onchange during programmatic rebuild — mobile browsers can fire it
+  // when innerHTML is replaced, which would reset the tip form mid-fill
+  const oh=sel.onchange; sel.onchange=null;
   sel.innerHTML='<option value="">Velg spiller...</option>'+Object.entries(players).map(([id,p])=>`<option value="${id}">${p.name}</option>`).join('');
   if(cur)sel.value=cur;
+  sel.onchange=oh;
   const lbl=document.getElementById('tip-player-label');
   if(lbl&&devicePlayerId&&players[devicePlayerId])lbl.textContent=`Hvem tipper? 📱 ${players[devicePlayerId].name} oppdaget`;
 }
@@ -835,11 +840,14 @@ function getClockDisplay(mk){
 // ─── LIVE EVENT DETECTION ───
 function checkNewEvents(mk, events){
   if(!knownEventKeys[mk])knownEventKeys[mk]=new Set();
-  return events.filter(ev=>{
+  const firstLoad=!seededMatches.has(mk);
+  const newEvs=events.filter(ev=>{
     const k=`${ev.time?.elapsed}-${ev.type}-${ev.player?.name}`;
     if(knownEventKeys[mk].has(k))return false;
     knownEventKeys[mk].add(k); return true;
   });
+  if(firstLoad){ seededMatches.add(mk); return []; } // seed silently, no banners on load
+  return newEvs;
 }
 function showEventBanner(ev, mk){
   const banner=document.getElementById('tv-event-banner'); if(!banner)return;
