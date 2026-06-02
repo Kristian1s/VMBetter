@@ -141,6 +141,10 @@ select option{background:var(--bg3)}
 #tab-tv.active{display:grid;grid-template-columns:1fr 1fr 320px;grid-template-rows:auto 1fr auto;gap:14px;height:100%;max-width:none;margin:0 auto;padding:1.25rem;box-sizing:border-box}
 @media(min-width:900px){#tab-tv.active{display:grid}}
 .tv-col-scroll{overflow-y:auto;}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:var(--text3)}
 
 /* BET TICKER */
 .tv-ticker{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
