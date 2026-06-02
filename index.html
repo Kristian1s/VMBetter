@@ -1624,7 +1624,6 @@ function spawnConfetti(){
 }
 
 let pendingBet = null;
-let parlayMode = false;
 let parlayLegs = []; // [{matchKey, betId, desc, odds}]
 
 window.selectBetMatch=function(mk){
@@ -1721,13 +1720,7 @@ window.renderBetCatalog = function(){
   const wonIds=new Set(Object.values(bets).filter(b=>b.matchKey===mk&&b.status==='won').map(b=>b.betId));
   const lostIds=new Set(Object.values(bets).filter(b=>b.matchKey===mk&&b.status==='lost').map(b=>b.betId));
 
-  const parlayToggle=`<div style="display:flex;justify-content:flex-end;margin-bottom:8px">
-    <button class="btn btn-sm${parlayMode?' btn-primary':''}" onclick="toggleParlayMode()">
-      🔗 ${parlayMode?`Avslutt parlay (${parlayLegs.length} ben)`:'Kombiner → Parlay'}
-    </button>
-  </div>`;
-
-  el.innerHTML = parlayToggle + catalog.categories.map(cat=>{
+  el.innerHTML = catalog.categories.map(cat=>{
     const items=cat.bets.map(b=>{
       if(wonIds.has(b.id)||lostIds.has(b.id))return'';
       const placers=placersByBetId[b.id]||[];
@@ -1736,11 +1729,11 @@ window.renderBetCatalog = function(){
       const oddsTag=live.changed
         ?`<span class="odds-badge" style="background:${live.dir==='down'?'var(--green-light)':'var(--red-light)'}; color:${live.dir==='down'?'var(--green)':'var(--red)'}">${oddsDisplay}× ${live.dir==='down'?'↓':'↑'}</span>`
         :`<span class="odds-badge">${oddsDisplay}×</span>`;
-      const tag=placers.length?`<span style="color:var(--green);font-size:12px">✓ ${placers.join(', ')}</span>`:'';
+      const tag=placers.length?`<span style="color:var(--text2);font-size:12px">✓ ${placers.join(', ')}</span>`:'';
       const inParlay=parlayLegs.some(l=>l.matchKey===mk&&l.betId===b.id);
-      const parlayCheck=parlayMode?`<span style="font-size:18px;margin-right:6px;flex-shrink:0">${inParlay?'✅':'⬜'}</span>`:'';
-      return`<div class="bet-item${(placers.length||inParlay)?' already-placed':''}" onclick="${parlayMode?`addToParlay('${mk}','${b.id}')`:`selectBet('${mk}','${b.id}')`}">
-        ${parlayCheck}<div class="bet-item-text">${b.text} ${tag}</div>
+      const selCheck=inParlay?`<span style="font-size:18px;margin-right:6px;flex-shrink:0">✅</span>`:'';
+      return`<div class="bet-item${inParlay?' already-placed':''}" onclick="toggleBetSelection('${mk}','${b.id}')">
+        ${selCheck}<div class="bet-item-text">${b.text} ${tag}</div>
         <div class="bet-item-odds">${oddsTag}</div>
       </div>`;
     }).join('');
@@ -1749,19 +1742,37 @@ window.renderBetCatalog = function(){
   }).join('');
 };
 
-window.selectBet = function(mk, betId){
-  const bet = getBetDef(mk, betId); if(!bet) return;
-  pendingBet = { matchKey:mk, betId, betText:bet.text, odds:bet.odds };
-  const sel = document.getElementById('bet-placer-sel');
-  sel.innerHTML = '<option value="">Velg spiller...</option>' + Object.entries(players).map(([id,p])=>`<option value="${id}">${p.name}</option>`).join('');
-  if(devicePlayerId)sel.value=devicePlayerId;
-  updateBudgetDisplay();
-  document.getElementById('bet-place-desc').textContent = bet.text;
-  document.getElementById('bet-place-odds').textContent = `Odds: ${bet.odds}× · Du drikker innsatsen med én gang`;
-  document.getElementById('bet-stake').value = '2';
-  updatePayoutPreview();
-  document.getElementById('bet-place-panel').style.display='block';
-  document.getElementById('bet-place-panel').scrollIntoView({behavior:'smooth',block:'nearest'});
+window.toggleBetSelection = function(mk, betId){
+  const def = getBetDef(mk, betId); if(!def) return;
+  const idx = parlayLegs.findIndex(l=>l.matchKey===mk&&l.betId===betId);
+  if(idx >= 0) parlayLegs.splice(idx, 1);
+  else parlayLegs.push({matchKey:mk, betId, desc:def.text, odds:def.odds});
+  if(parlayLegs.length === 0){
+    document.getElementById('bet-place-panel').style.display='none';
+    document.getElementById('parlay-builder-panel').style.display='none';
+    pendingBet = null;
+  } else if(parlayLegs.length === 1){
+    const leg = parlayLegs[0];
+    const bet = getBetDef(leg.matchKey, leg.betId);
+    pendingBet = {matchKey:leg.matchKey, betId:leg.betId, betText:bet.text, odds:bet.odds};
+    const sel = document.getElementById('bet-placer-sel');
+    sel.innerHTML = '<option value="">Velg spiller...</option>' + Object.entries(players).map(([id,p])=>`<option value="${id}">${p.name}</option>`).join('');
+    if(devicePlayerId) sel.value = devicePlayerId;
+    updateBudgetDisplay();
+    document.getElementById('bet-place-desc').textContent = bet.text;
+    document.getElementById('bet-place-odds').textContent = `Odds: ${bet.odds}×`;
+    document.getElementById('bet-stake').value = '2';
+    updatePayoutPreview();
+    document.getElementById('parlay-builder-panel').style.display='none';
+    document.getElementById('bet-place-panel').style.display='block';
+    document.getElementById('bet-place-panel').scrollIntoView({behavior:'smooth',block:'nearest'});
+  } else {
+    pendingBet = null;
+    document.getElementById('bet-place-panel').style.display='none';
+    renderParlayBuilder();
+    document.getElementById('parlay-builder-panel').scrollIntoView({behavior:'smooth',block:'nearest'});
+  }
+  renderBetCatalog();
 };
 
 window.updateBudgetDisplay = function(){
@@ -1809,32 +1820,17 @@ window.confirmBet = function(){
     stake, payout, placerId:pid, placerName:players[pid]?.name||'', status:'open', createdAt:Date.now()
   });
   document.getElementById('bet-place-panel').style.display='none';
-  pendingBet=null;
+  pendingBet=null; parlayLegs=[];
   showToast(`Bet plassert! ${stake} token${stake!==1?'s':''} satset 🎯`);
   renderBetCatalog(); renderBets();
 };
-window.cancelBet=function(){ document.getElementById('bet-place-panel').style.display='none'; pendingBet=null; };
+window.cancelBet=function(){ document.getElementById('bet-place-panel').style.display='none'; pendingBet=null; parlayLegs=[]; renderBetCatalog(); };
 
 // ─── PARLAY SYSTEM ───
-window.toggleParlayMode=function(){
-  parlayMode=!parlayMode;
-  if(!parlayMode){ parlayLegs=[]; document.getElementById('parlay-builder-panel').style.display='none'; }
-  document.getElementById('bet-place-panel').style.display='none'; pendingBet=null;
-  renderBetCatalog();
-};
-
-window.addToParlay=function(mk, betId){
-  const def=getBetDef(mk,betId); if(!def)return;
-  const idx=parlayLegs.findIndex(l=>l.matchKey===mk&&l.betId===betId);
-  if(idx>=0) parlayLegs.splice(idx,1);
-  else parlayLegs.push({matchKey:mk,betId,desc:def.text,odds:def.odds});
-  renderParlayBuilder();
-  renderBetCatalog();
-};
 
 function renderParlayBuilder(){
   const panel=document.getElementById('parlay-builder-panel'); if(!panel)return;
-  if(!parlayMode||!parlayLegs.length){ panel.style.display='none'; return; }
+  if(!parlayLegs.length){ panel.style.display='none'; return; }
   const combinedOdds=parseFloat(parlayLegs.reduce((a,l)=>a*l.odds,1).toFixed(2));
   document.getElementById('parlay-legs-list').innerHTML=parlayLegs.map(l=>
     `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);font-size:13px">
@@ -1901,7 +1897,6 @@ window.confirmParlay=function(){
     status:'open', createdAt:Date.now()
   });
   parlayLegs=[];
-  parlayMode=false;
   document.getElementById('parlay-builder-panel').style.display='none';
   showToast(`Parlay plassert! ${legCount} ben, odds ${combinedOdds}× 🔗`);
   renderBetCatalog(); renderBets();
@@ -1909,7 +1904,6 @@ window.confirmParlay=function(){
 
 window.cancelParlay=function(){
   parlayLegs=[];
-  parlayMode=false;
   document.getElementById('parlay-builder-panel').style.display='none';
   renderBetCatalog();
 };
@@ -2522,7 +2516,7 @@ function renderTVTips(){
   const el=document.getElementById('tv-tips'); if(!el)return;
   const sorted=getSorted();
   const rest=sorted.slice(3,13); // positions 4-13
-  if(!rest.length){ el.innerHTML='<div style="color:var(--text3);font-size:28px;padding-top:4px">Kun 3 spillere</div>'; return; }
+  if(!rest.length){ el.innerHTML=''; return; }
 
   function tvAvatar(p){
     return p?.avatar?.startsWith('data:')
