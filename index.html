@@ -385,15 +385,15 @@ select option{background:var(--bg3)}
     </div>
 
     <!-- COL 1 BOTTOM: Tippekonk predictions -->
-    <div class="tv-card tv-col-scroll" id="tv-tips-card" style="grid-column:1;grid-row:2">
-      <div class="tv-title">📊 RANGERING</div>
-      <div id="tv-tips"></div>
+    <div class="tv-card" id="tv-tips-card" style="grid-column:1;grid-row:2;display:flex;flex-direction:column;overflow:hidden">
+      <div class="tv-title" style="flex-shrink:0">📊 RANGERING</div>
+      <div id="tv-tips" style="overflow-y:auto;flex:1;min-height:0"></div>
     </div>
 
     <!-- COL 2 BOTTOM: Bookern bets -->
-    <div class="tv-card tv-col-scroll" id="tv-bets-right" style="grid-column:2;grid-row:2">
-      <div class="tv-title">🃏 BOOKERN</div>
-      <div id="tv-bets-right-content"></div>
+    <div class="tv-card" id="tv-bets-right" style="grid-column:2;grid-row:2;display:flex;flex-direction:column;overflow:hidden">
+      <div class="tv-title" style="flex-shrink:0">🃏 BOOKERN</div>
+      <div id="tv-bets-right-content" style="overflow-y:auto;flex:1;min-height:0"></div>
     </div>
 
     <!-- ROW 3: Bet ticker — spans all columns -->
