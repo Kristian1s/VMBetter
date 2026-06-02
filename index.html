@@ -410,7 +410,7 @@ select option{background:var(--bg3)}
   </div>
 
   <!-- ===== STATS ===== -->
-  <div class="section" id="tab-stats" style="display:none"></div>
+  <div class="section" id="tab-stats"></div>
 
 </div>
 
@@ -2280,7 +2280,7 @@ window.showBreakdown=function(playerId){
     const mk=t.matchKey;
     const score=liveScores[mk];
     const isLive=score&&['1H','HT','2H','ET','P'].includes(score.status);
-    const isFT=(score&&score.status==='FT')||t.resolved;
+    const isFT=(score&&['FT','AET','FT_PEN'].includes(score.status))||t.resolved||(typeof t.livePoints==='number'&&!score&&!isLive);
     const hg=score&&typeof score.homeGoals==='number'?score.homeGoals:typeof t.actualHome==='number'?t.actualHome:null;
     const ag=score&&typeof score.awayGoals==='number'?score.awayGoals:typeof t.actualAway==='number'?t.actualAway:null;
 
@@ -2303,38 +2303,41 @@ window.showBreakdown=function(playerId){
         <span class="breakdown-label" style="color:var(--text);font-weight:600">Poeng for stilling</span>
         <span class="breakdown-pts ${mainPts>0?'hit':'miss'}">${mainPts>0?'+'+mainPts:mainPts}p</span>
       </div>`;
+    } else if(isFT) {
+      const storedPts=getTipPoints(t);
+      rows+=`<div class="breakdown-row">
+        <span class="breakdown-label">✅ Kamp ferdig</span>
+        <span class="breakdown-pts hit">${storedPts>0?'+'+storedPts:storedPts}p</span>
+      </div>`;
     } else {
       rows+=breakdown('Stilling', '?', null);
     }
 
-    // Bonus questions
-    const evs=score?.events||[];
-    const firstGoal=evs.find(e=>e.type==='Goal');
-    let actualFS=null;
-    if(firstGoal){ const home=MATCHES[mk]?.home||''; actualFS=firstGoal.team.name.toLowerCase().includes(home.toLowerCase().split(' ')[0])?'H':'A'; }
-    let fhg=false;
-    if(score?.halftime&&typeof score.halftime.home==='number'){ fhg=(score.halftime.home+score.halftime.away)>0; }
-    else{ fhg=evs.some(e=>e.type==='Goal'&&e.time?.elapsed<=45); }
-    // Player scorer bonuses
-    function playerScoredBreakdown(label, field, scored){
-      if(scored){ rows+=breakdown(label, t[field]==='Y'?1:0, t[field]==='Y'); }
-      else if(isFT){ rows+=breakdown(label, t[field]==='N'?1:0, t[field]==='N'); }
-      else{ rows+=breakdown(label, '?', null); }
+    // Bonus questions — only if we have actual score/event data
+    const hasScoreData = hg!==null;
+    if(hasScoreData || !isFT){
+      const evs=score?.events||[];
+      const firstGoal=evs.find(e=>e.type==='Goal');
+      let actualFS=null;
+      if(firstGoal){ const home=MATCHES[mk]?.home||''; actualFS=firstGoal.team.name.toLowerCase().includes(home.toLowerCase().split(' ')[0])?'H':'A'; }
+      let fhg=false;
+      if(score?.halftime&&typeof score.halftime.home==='number'){ fhg=(score.halftime.home+score.halftime.away)>0; }
+      else{ fhg=evs.some(e=>e.type==='Goal'&&e.time?.elapsed<=45); }
+      function playerScoredBreakdown(label, field, scored){
+        if(scored){ rows+=breakdown(label, t[field]==='Y'?1:0, t[field]==='Y'); }
+        else if(isFT){ rows+=breakdown(label, t[field]==='N'?1:0, t[field]==='N'); }
+        else{ rows+=breakdown(label, '?', null); }
+      }
+      if(actualFS!==null){ rows+=breakdown('⚽ Første scorer', t.firstScorer===actualFS?1:0, t.firstScorer===actualFS); }
+      else if(isFT){ rows+=breakdown('⚽ Første scorer (0–0)', 0, false); }
+      else{ rows+=breakdown('⚽ Første scorer', '?', null); }
+      if(fhg||isFT){ const hit=(t.firstHalfGoal==='Y')===fhg; rows+=breakdown('⏱️ Mål i 1. omgang', hit?1:0, hit); }
+      else{ rows+=breakdown('⏱️ Mål i 1. omgang', '?', null); }
+      (MATCH_PLAYER_BETS[mk]||[]).forEach(pb=>{
+        const scored=goalEvents(evs).some(e=>pb.names.some(n=>e.player?.name?.toLowerCase().includes(n)));
+        playerScoredBreakdown(`🔵 ${pb.label}`, pb.field, scored);
+      });
     }
-    // Scorer
-    if(actualFS!==null){ rows+=breakdown('⚽ Første scorer', t.firstScorer===actualFS?1:0, t.firstScorer===actualFS); }
-    else if(isFT){ rows+=breakdown('⚽ Første scorer (0–0)', 0, false); }
-    else{ rows+=breakdown('⚽ Første scorer', '?', null); }
-
-    // First half goal
-    if(fhg||isFT){ const hit=(t.firstHalfGoal==='Y')===fhg; rows+=breakdown('⏱️ Mål i 1. omgang', hit?1:0, hit); }
-    else{ rows+=breakdown('⏱️ Mål i 1. omgang', '?', null); }
-
-    // Match-specific player scorers
-    (MATCH_PLAYER_BETS[mk]||[]).forEach(pb=>{
-      const scored=goalEvents(evs).some(e=>pb.names.some(n=>e.player?.name?.toLowerCase().includes(n)));
-      playerScoredBreakdown(`🔵 ${pb.label}`, pb.field, scored);
-    });
 
     rows+=`<div class="breakdown-row" style="margin-top:4px;border-top:1px solid var(--border2);padding-top:8px">
       <span style="font-size:14px;font-weight:600;color:var(--text)">Tipping totalt</span>
