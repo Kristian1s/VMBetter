@@ -2129,30 +2129,25 @@ function renderStats(){
   const totalWon=Object.values(bets).filter(b=>b.status==='won').reduce((s,b)=>s+(b.payout||0),0);
   const overallWinRate=totalBets?Math.round(Object.values(bets).filter(b=>b.status==='won').length/totalBets*100):0;
 
-  const awardCols=Math.min(awards.length,6);
-  el.innerHTML=`<div style="display:grid;grid-template-columns:repeat(${awardCols},1fr);grid-template-rows:auto 1fr;gap:14px;padding:1.25rem;height:100%;box-sizing:border-box">
+  el.innerHTML=`<div style="padding:1.25rem;display:flex;flex-direction:column;gap:14px;height:100%;box-sizing:border-box;overflow:auto">
 
-    <!-- Awards row -->
-    <div style="grid-column:1/-1;display:grid;grid-template-columns:repeat(${awardCols},1fr);gap:14px">
-      ${awards.join('')}
-    </div>
+    ${awards.length?`<div style="display:grid;grid-template-columns:repeat(${Math.min(awards.length,6)},1fr);gap:14px">${awards.join('')}</div>`:''}
 
-    <!-- Win rate panel -->
-    <div class="tv-card tv-col-scroll" style="grid-column:1/${Math.ceil(awardCols/2)+1}">
-      <div class="tv-title" style="font-size:20px;margin-bottom:.75rem">📈 Treffratio per spiller</div>
-      ${sortedByWinRate.length?winRateRows:`<div style="color:var(--text3);font-size:20px">Ingen bets ennå</div>`}
-    </div>
-
-    <!-- Category breakdown panel -->
-    <div class="tv-card tv-col-scroll" style="grid-column:${Math.ceil(awardCols/2)+1}/-1">
-      <div class="tv-title" style="font-size:20px;margin-bottom:.75rem">🃏 Bet-kategorier</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;margin-bottom:12px">
-        <div style="font-size:18px;color:var(--text2)">Totale bets: <strong style="color:var(--text)">${totalBets}</strong></div>
-        <div style="font-size:18px;color:var(--text2)">Tokens satset: <strong style="color:var(--text)">${totalTokensWagered}T</strong></div>
-        <div style="font-size:18px;color:var(--text2)">Tokens delt ut: <strong style="color:var(--green)">${totalWon}T</strong></div>
-        <div style="font-size:18px;color:var(--text2)">Treffratio: <strong style="color:${overallWinRate>=50?'var(--green)':'var(--amber)'}">${overallWinRate}%</strong></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;flex:1;min-height:0">
+      <div class="tv-card tv-col-scroll">
+        <div class="tv-title" style="font-size:20px;margin-bottom:.75rem">📈 Treffratio per spiller</div>
+        ${sortedByWinRate.length?winRateRows:`<div style="color:var(--text3);font-size:20px">Ingen bets ennå</div>`}
       </div>
-      ${catRows||`<div style="color:var(--text3);font-size:20px">Ingen bets ennå</div>`}
+      <div class="tv-card tv-col-scroll">
+        <div class="tv-title" style="font-size:20px;margin-bottom:.75rem">🃏 Bet-kategorier</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;margin-bottom:12px">
+          <div style="font-size:18px;color:var(--text2)">Totale bets: <strong style="color:var(--text)">${totalBets}</strong></div>
+          <div style="font-size:18px;color:var(--text2)">Tokens satset: <strong style="color:var(--text)">${totalTokensWagered}T</strong></div>
+          <div style="font-size:18px;color:var(--text2)">Tokens delt ut: <strong style="color:var(--green)">${totalWon}T</strong></div>
+          <div style="font-size:18px;color:var(--text2)">Treffratio: <strong style="color:${overallWinRate>=50?'var(--green)':'var(--amber)'}">${overallWinRate}%</strong></div>
+        </div>
+        ${catRows||`<div style="color:var(--text3);font-size:20px">Ingen bets ennå</div>`}
+      </div>
     </div>
 
   </div>`;
