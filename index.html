@@ -462,7 +462,7 @@ const RAPID_KEY = "86b71ea67bmsh076351ff0c7fb59p12fb39jsnb660034bd93f";
 
 let MATCHES = {};   // populated from Firebase config/matches
 let BET_CATALOG = {}; // generated from MATCHES via generateBetCatalog()
-let oddsApiKey = '';
+const oddsApiKey = 'a19c45d74c3b12964ca45e98ad264844';
 
 const TOKEN_BUDGET = 20;
 const MAX_SINGLE_STAKE = 10;
@@ -499,7 +499,6 @@ let bannerTimer;
 function isAdmin(){ return window.innerWidth>=900; }
 
 // ─── FIREBASE ───
-onValue(ref(db,'config/oddsApiKey'), s=>{ oddsApiKey=s.val()||''; });
 onValue(ref(db,'config/matches'), s=>{
   MATCHES=s.val()||{};
   rebuildBetCatalogs();
@@ -638,13 +637,6 @@ function renderAdminPlayers(){
         <button class="btn btn-primary" onclick="fetchAndAddMatch()">Hent</button>
       </div>
       <div style="font-size:11px;color:var(--text3);margin-top:5px">Finn ID på espn.com — siste tall i kampens URL</div>
-      <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
-        <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:5px">🔑 The Odds API nøkkel <span style="font-weight:400;color:var(--text3)">(the-odds-api.com — gratis)</span></div>
-        <div style="display:flex;gap:6px">
-          <input type="text" id="odds-api-key-input" placeholder="Lim inn API nøkkel her" style="flex:1;font-size:12px" value="${oddsApiKey}">
-          <button class="btn btn-sm" onclick="saveOddsApiKey()">Lagre</button>
-        </div>
-      </div>
     </div>
   </div>`;
 
@@ -1493,9 +1485,6 @@ window.fetchAndAddMatch=async function(){
   const league=document.getElementById('add-match-league').value;
   const espnId=parseInt(document.getElementById('add-match-id').value);
   if(!espnId){showToast('Skriv inn ESPN event ID!');return;}
-  // Auto-save API key from input field if provided (don't require a separate "Lagre" click)
-  const keyInput=document.getElementById('odds-api-key-input')?.value?.trim();
-  if(keyInput&&keyInput!==oddsApiKey){ set(ref(db,'config/oddsApiKey'),keyInput); oddsApiKey=keyInput; }
   showToast('Henter kamp fra ESPN...');
   const s=await fetchESPN(league,espnId);
   if(!s){showToast('Fant ikke kampen – sjekk ID og league ⚠️');return;}
@@ -1522,13 +1511,6 @@ window.refreshMatchOdds=async function(mk){
 window.removeMatch=function(mk){
   if(confirm(`Fjerne ${MATCHES[mk]?.label}?`))remove(ref(db,`config/matches/${mk}`));
 };
-window.saveOddsApiKey=function(){
-  const key=document.getElementById('odds-api-key-input')?.value?.trim();
-  if(!key){showToast('Ingen nøkkel å lagre');return;}
-  set(ref(db,'config/oddsApiKey'),key);
-  showToast('Odds API nøkkel lagret ✅');
-};
-
 // ─── ODDS API FETCH ───
 async function fetchOddsForMatch(home, away, apiKey){
   const SPORT='soccer_fifa_world_cup';
