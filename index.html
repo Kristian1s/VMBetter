@@ -271,7 +271,7 @@ select option{background:var(--bg3)}
   <div class="tabs">
     <button class="tab active" onclick="showTab('spillere')">Min oversikt</button>
     <button class="tab" onclick="showTab('tipping')">🏆 Tippekonk</button>
-    <button class="tab" onclick="showTab('betting')">🃏 Bookern</button>
+    <button class="tab" onclick="showTab('betting')">🃏 Oddsen</button>
     <button class="tab tab-tv" onclick="showTab('tv')">📺 Storskjerm</button>
     <button class="tab tab-tv" onclick="showTab('stats')">📊 Stats</button>
   </div>
@@ -308,7 +308,7 @@ select option{background:var(--bg3)}
 
   <!-- ===== BETTING ===== -->
   <div class="section" id="tab-betting">
-    <div class="section-title">Bookern</div>
+    <div class="section-title">Oddsen</div>
 
     <!-- Step 1: pick match -->
     <div class="card">
@@ -376,7 +376,7 @@ select option{background:var(--bg3)}
       <div class="podium-stage" id="podium-stage"></div>
     </div>
 
-    <!-- COL 2 TOP: Bookern podium (compact) -->
+    <!-- COL 2 TOP: Oddsen podium (compact) -->
     <div class="podium-wrap tv-card podium-sm" id="tv-slurkebet-podium" style="grid-column:2;grid-row:1">
       <div class="podium-headline">BOOKERN 🃏</div>
       <div class="podium-stage" id="slurkebet-podium-stage"></div>
@@ -394,7 +394,7 @@ select option{background:var(--bg3)}
       <div id="tv-tips" style="overflow-y:auto;flex:1;min-height:0"></div>
     </div>
 
-    <!-- COL 2 BOTTOM: Bookern bets -->
+    <!-- COL 2 BOTTOM: Oddsen bets -->
     <div class="tv-card" id="tv-bets-right" style="grid-column:2;grid-row:2;display:flex;flex-direction:column;overflow:hidden">
       <div class="tv-title" style="flex-shrink:0">🃏 BOOKERN</div>
       <div id="tv-bets-right-content" style="overflow-y:auto;flex:1;min-height:0"></div>
@@ -694,7 +694,7 @@ function renderMyOverview(){
       </div>
     </div>
     <div class="card">
-      <div class="card-label">Bookern — tokens</div>
+      <div class="card-label">Oddsen — tokens</div>
       <div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text2);margin-bottom:8px">
         <span>Brukt: <strong style="color:var(--text)">${spent}/${TOKEN_BUDGET}</strong></span>
         <span>Vunnet: <strong style="color:var(--green)">+${wonSlurk}</strong></span>
@@ -719,14 +719,14 @@ function renderMyOverview(){
           <span style="color:var(--amber);font-weight:600">${pts}p${isLive?' 🔴':''}</span>
         </div>
         <div style="font-size:14px">${t.hub} · ${t.homeGoals}–${t.awayGoals}</div>
-        <div style="font-size:12px;color:var(--text2);margin-top:2px">⚽ ${t.firstScorer==='H'?match?.home||'H':t.firstScorer==='A'?match?.away||'A':'–'} · ⏱️ ${t.firstHalfGoal==='Y'?'Ja':'Nei'}${(MATCH_PLAYER_BETS[t.matchKey]||[]).map(pb=>` · 🔵 ${pb.abbr}:${t[pb.field]==='Y'?'Ja':'Nei'}`).join('')}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px">⚽ ${t.firstScorer==='H'?match?.home||'H':t.firstScorer==='A'?match?.away||'A':t.firstScorer==='NONE'?'0–0':'–'} · ⏱️ ${t.firstHalfGoal==='Y'?'Ja':'Nei'}${(MATCH_PLAYER_BETS[t.matchKey]||[]).map(pb=>` · 🔵 ${pb.abbr}:${t[pb.field]==='Y'?'Ja':'Nei'}`).join('')}</div>
       </div>`;
     });
     html+=`</div>`;
   }
 
   if(myBets.length){
-    html+=`<div class="card"><div class="card-label">Mine bets — Bookern</div>`;
+    html+=`<div class="card"><div class="card-label">Mine bets — Oddsen</div>`;
     myBets.forEach(([,b])=>{
       const sc=b.status==='won'?'var(--green)':b.status==='lost'?'var(--red)':'var(--amber)';
       const sl=b.status==='won'?'🎉 TREFF':b.status==='lost'?'❌ Bom':'⏳ Åpen';
@@ -1020,9 +1020,9 @@ function calcLivePoints(mk, score){
     const hubHit=!diffHit&&!exactHit&&t.hub===actualHub;
     let pts=exactHit?7:diffHit?5:hubHit?3:0;
 
-    // Bonus: first scorer (1p) — 0-0 at FT = no points for anyone
+    // Bonus: first scorer (1p) — NONE = predicted 0-0, earns point if no goals at FT
     if(actualFS!==null){ if(t.firstScorer===actualFS)pts+=1; }
-    // (if actualFS===null at FT it's 0-0 → no points, intentional)
+    else if(isFinal){ if(t.firstScorer==='NONE')pts+=1; }
 
     // Bonus: first half goal (1p) — 'Y' confirmed live, 'N' only at FT
     if(firstHalfGoal){ if(t.firstHalfGoal==='Y')pts+=1; }
@@ -1086,7 +1086,7 @@ function showKickoffLock(mk,score,el){
 }
 function showLockedTip(mk,t,el){
   const match=MATCHES[mk];
-  const scorerLabel=t.firstScorer==='H'?match?.home:t.firstScorer==='A'?match?.away:'–';
+  const scorerLabel=t.firstScorer==='H'?match?.home:t.firstScorer==='A'?match?.away:t.firstScorer==='NONE'?'0–0':'–';
   el.innerHTML=`<div class="card" style="border-color:var(--green)">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
       <span style="font-size:20px">🔒</span>
@@ -1239,10 +1239,11 @@ window.renderTipForm=function(){
       <div style="text-align:center;font-size:12px;color:var(--text2)">${match.home} – ${match.away}</div></div>
     <div class="card"><div class="card-label">Bonusspørsmål — 1 poeng hver</div>
       <div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:4px">⚽ Første lag som scorer</div>
-      <div style="font-size:11px;color:var(--text3);margin-bottom:8px">0–0 gir ingen poeng her</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:8px">Velg 0–0 hvis du tror ingen scorer</div>
       <div style="margin-bottom:12px">
         <span class="bonus-opt" id="fs-H" onclick="selBonus('firstScorer','H',this)">${match.home}</span>
         <span class="bonus-opt" id="fs-A" onclick="selBonus('firstScorer','A',this)">${match.away}</span>
+        <span class="bonus-opt" id="fs-NONE" onclick="selBonus('firstScorer','NONE',this)">0–0</span>
       </div>
       <div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:6px">⏱️ Mål i 1. omgang?</div>
       <div style="margin-bottom:12px">
@@ -1710,7 +1711,7 @@ window.renderBetCatalog = function(){
     el.innerHTML=`<div class="card" style="border-color:${done?'var(--green)':'var(--red)'}">
       <div style="display:flex;align-items:center;gap:10px">
         <span style="font-size:22px">${done?'✅':'🔒'}</span>
-        <div style="flex:1"><div style="font-weight:600">${done?'Kamp ferdig':'Kampen er i gang – Bookern stengt!'}</div>
+        <div style="flex:1"><div style="font-weight:600">${done?'Kamp ferdig':'Kampen er i gang – Oddsen stengt!'}</div>
         <div style="font-size:12px;color:var(--text2)">Ingen nye bets kan plasseres</div></div>
         <div style="font-family:'Bebas Neue',sans-serif;font-size:28px">${score.homeGoals} – ${score.awayGoals}</div>
       </div></div>`;
@@ -2197,7 +2198,7 @@ function renderTVTicker(){
       </div>`;
     }
 
-    // Bookern bet
+    // Oddsen bet
     const b=d;
     const won=b.status==='won', lost=b.status==='lost';
     const borderCol=won?'var(--green)':lost?'var(--red)':'var(--amber)';
@@ -2214,7 +2215,7 @@ function renderTVTicker(){
       :'';
     return`<div class="tv-ticker-card${isNew?' new':''}" style="border-color:${borderCol};background:rgba(239,159,39,0.06)">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
-        <span style="font-size:13px;font-weight:700;color:var(--amber);letter-spacing:.06em;text-transform:uppercase">🃏 Bookern</span>
+        <span style="font-size:13px;font-weight:700;color:var(--amber);letter-spacing:.06em;text-transform:uppercase">🃏 Oddsen</span>
         <span style="font-size:13px;color:var(--text3)">${b.matchLabel||''}</span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:3px">
@@ -2333,7 +2334,7 @@ window.showBreakdown=function(playerId){
         else{ rows+=breakdown(label, '?', null); }
       }
       if(actualFS!==null){ rows+=breakdown('⚽ Første scorer', t.firstScorer===actualFS?1:0, t.firstScorer===actualFS); }
-      else if(isFT){ rows+=breakdown('⚽ Første scorer (0–0)', 0, false); }
+      else if(isFT){ rows+=breakdown('⚽ Første scorer (0–0)', t.firstScorer==='NONE'?1:0, t.firstScorer==='NONE'); }
       else{ rows+=breakdown('⚽ Første scorer', '?', null); }
       if(fhg||isFT){ const hit=(t.firstHalfGoal==='Y')===fhg; rows+=breakdown('⏱️ Mål i 1. omgang', hit?1:0, hit); }
       else{ rows+=breakdown('⏱️ Mål i 1. omgang', '?', null); }
@@ -2351,7 +2352,7 @@ window.showBreakdown=function(playerId){
 
   // Slurker
   rows+=`<div class="breakdown-row">
-    <span class="breakdown-label">🃏 Bookern (netto tokens)</span>
+    <span class="breakdown-label">🃏 Oddsen (netto tokens)</span>
     <span class="breakdown-pts ${sip>=0?'hit':'miss'}">${sip>=0?'+':''}${sip} token${Math.abs(sip)!==1?'s':''}</span>
   </div>`;
 
