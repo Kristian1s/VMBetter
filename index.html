@@ -265,6 +265,14 @@ select option{background:var(--bg3)}
 .breakdown-pts.hit{color:#4ecfa0}
 .breakdown-pts.miss{color:var(--red)}
 .breakdown-pts.pending{color:var(--amber)}
+
+/* ODDS ADMIN */
+.odds-section-label{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text3);margin:14px 0 6px}
+.odds-field-wrap{display:flex;flex-direction:column;gap:3px}
+.odds-field-label{font-size:11px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color .15s}
+.odds-field-label.set{color:var(--green)}
+.odds-mini-input{text-align:center;font-size:14px;font-weight:700;padding:7px 4px;border-color:var(--border2);transition:border-color .15s}
+.odds-mini-input.set{border-color:var(--green)}
 </style>
 </head>
 <body>
@@ -284,6 +292,7 @@ select option{background:var(--bg3)}
     <button class="tab active" onclick="showTab('spillere')">Min oversikt</button>
     <button class="tab" onclick="showTab('tipping')">🏆 Tippekonk</button>
     <button class="tab" onclick="showTab('betting')">🃏 Oddsen</button>
+    <button class="tab" onclick="showTab('odds')">⚙️ Odds</button>
     <button class="tab tab-tv" onclick="showTab('tv')">📺 Storskjerm</button>
     <button class="tab tab-tv" onclick="showTab('stats')">📊 Stats</button>
   </div>
@@ -378,6 +387,11 @@ select option{background:var(--bg3)}
     <div id="bets-list"></div>
   </div>
 
+  <!-- ===== ODDS ADMIN ===== -->
+  <div class="section" id="tab-odds">
+    <div id="odds-admin-content"></div>
+  </div>
+
   <!-- ===== TV ===== -->
   <div id="tv-event-banner"></div>
   <div class="section" id="tab-tv">
@@ -470,6 +484,10 @@ const oddsApiKey = 'a19c45d74c3b12964ca45e98ad264844';
 
 const TOKEN_BUDGET = 20;
 const MAX_SINGLE_STAKE = 10;
+const ODDS_PIN = '1234';
+
+let manualOdds = {};
+let oddsAdminUnlocked = false;
 
 // Match-specific player scorer bonuses — keyed by match key
 const MATCH_PLAYER_BETS = {
@@ -514,6 +532,7 @@ onValue(ref(db,'config/matches'), s=>{
 onValue(ref(db,'players'), s=>{ players=s.val()||{}; setSync(true); renderPlayers(); renderBettorSelect(); renderPlayerSelects(); if(currentTab==='poeng')renderScore(); if(currentTab==='tv')renderTV(); });
 onValue(ref(db,'bets'), s=>{ bets=s.val()||{}; if(currentTab==='betting')renderBets(); if(currentTab==='tv')renderTV(); if(currentTab==='spillere')renderPlayers(); if(currentTab==='stats')renderStats(); });
 onValue(ref(db,'tips'), s=>{ tips=s.val()||{}; if(currentTab==='poeng')renderScore(); if(currentTab==='tv')renderTV(); if(currentTab==='spillere')renderPlayers(); if(currentTab==='stats')renderStats(); });
+onValue(ref(db,'config/manualOdds'), s=>{ manualOdds=s.val()||{}; rebuildBetCatalogs(); if(currentTab==='betting')renderBetCatalog(); if(currentTab==='odds')renderOddsAdmin(); });
 
 function setSync(live){ document.getElementById('sync-dot').className='dot'+(live?' live':''); document.getElementById('sync-label').textContent=live?'Live':'Kobler til...'; }
 
@@ -523,7 +542,7 @@ window.showTab=function(id){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   document.getElementById('tab-'+id).classList.add('active');
-  ['spillere','tipping','betting','tv','stats'].forEach((t,i)=>{ const el=document.querySelectorAll('.tab')[i]; if(el)el.classList.toggle('active',t===id); });
+  ['spillere','tipping','betting','odds','tv','stats'].forEach((t,i)=>{ const el=document.querySelectorAll('.tab')[i]; if(el)el.classList.toggle('active',t===id); });
   const mw=document.getElementById('main-wrap');
   if(id==='tv'||id==='stats'){ mw.style.maxWidth='none'; mw.style.padding='0'; mw.style.height='calc(100vh - 62px)'; }
   else{ mw.style.maxWidth=''; mw.style.padding=''; mw.style.height=''; }
@@ -531,6 +550,7 @@ window.showTab=function(id){
   if(id==='tipping'){ renderPlayerSelects(); renderLiveBox(); renderMatchButtons(); }
   if(id==='betting'){ renderBets(); renderBetCatalog(); renderMatchButtons(); }
   if(id==='poeng')renderScore();
+  if(id==='odds')renderOddsAdmin();
   if(id==='tv')renderTV();
   if(id==='stats')renderStats();
 };
@@ -1475,8 +1495,13 @@ function generateBetCatalog(mk, home, away, homeKey, awayKey, fetchedOdds){
 function rebuildBetCatalogs(){
   BET_CATALOG={};
   for(const[mk,m]of Object.entries(MATCHES)){
-    // Firebase fetchedOdds take priority, then hardcoded real odds, then generic derivation
-    const odds=m.fetchedOdds||HARDCODED_ODDS[mk]||null;
+    // manualOdds (admin input) > fetchedOdds (API) > HARDCODED_ODDS > Poisson fallback
+    let odds;
+    if(manualOdds[mk]){
+      odds={...(m.fetchedOdds||{}), ...(HARDCODED_ODDS[mk]||{}), ...manualOdds[mk]};
+    } else {
+      odds=m.fetchedOdds||HARDCODED_ODDS[mk]||null;
+    }
     const catalog=generateBetCatalog(mk,m.home,m.away,m.homeKey,m.awayKey,odds);
     const playerBets=(MATCH_PLAYER_BETS[mk]||[]).map(pb=>({
       id:`player-${pb.field}`,
@@ -1491,6 +1516,130 @@ function rebuildBetCatalogs(){
     BET_CATALOG[mk]=catalog;
   }
 }
+// ─── ODDS ADMIN ───
+window.checkOddsPin=function(){
+  const val=document.getElementById('odds-pin-input')?.value;
+  if(val===ODDS_PIN){ oddsAdminUnlocked=true; renderOddsAdmin(); }
+  else showToast('Feil PIN 🔐');
+};
+
+function oddsField(mk,field,label,saved){
+  const val=saved[field]||'';
+  const isSet=!!val;
+  const safeId=`odds-${mk}-${field}`.replace(/[^a-zA-Z0-9-_]/g,'_');
+  return `<div class="odds-field-wrap">
+    <div class="odds-field-label${isSet?' set':''}" id="lbl-${safeId}">${label}</div>
+    <input type="number" step="0.1" min="1.01" class="odds-mini-input${isSet?' set':''}" id="${safeId}" value="${val}" placeholder="auto"
+      oninput="const s=!!this.value;this.classList.toggle('set',s);document.getElementById('lbl-${safeId}').classList.toggle('set',s);">
+  </div>`;
+}
+
+function renderOddsAdmin(){
+  const el=document.getElementById('odds-admin-content'); if(!el)return;
+  if(!oddsAdminUnlocked){
+    el.innerHTML=`
+      <div class="section-title">⚙️ Odds Admin</div>
+      <div class="card" style="max-width:300px;margin:2rem auto;text-align:center">
+        <div style="font-size:40px;margin-bottom:12px">🔐</div>
+        <div style="font-weight:600;font-size:16px;margin-bottom:16px">PIN-kode</div>
+        <input type="password" id="odds-pin-input" maxlength="6" inputmode="numeric" placeholder="••••"
+          style="text-align:center;font-size:28px;letter-spacing:10px;margin-bottom:14px"
+          onkeydown="if(event.key==='Enter')checkOddsPin()">
+        <button class="btn btn-primary btn-full" onclick="checkOddsPin()">Lås opp</button>
+      </div>`;
+    setTimeout(()=>document.getElementById('odds-pin-input')?.focus(),100);
+    return;
+  }
+
+  const matches=Object.entries(MATCHES);
+  let html=`<div class="section-title">⚙️ Odds Admin</div>`;
+
+  if(!matches.length){
+    html+=`<div class="empty">Ingen kamper konfigurert</div>`;
+    el.innerHTML=html; return;
+  }
+
+  for(const[mk,m]of matches){
+    const saved=manualOdds[mk]||{};
+    const ha=m.home; const aa=m.away;
+    html+=`<div class="card" style="margin-bottom:14px">
+      <div class="card-label" style="font-size:13px;color:var(--text)">${ha} vs ${aa}</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:10px">Tomme felt = automatisk beregning. Grønne felt er lagret.</div>
+
+      <div class="odds-section-label">Kampresultat</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:4px">
+        ${oddsField(mk,'homeOdds',ha,saved)}
+        ${oddsField(mk,'drawOdds','Uavgjort',saved)}
+        ${oddsField(mk,'awayOdds',aa,saved)}
+      </div>
+
+      <div class="odds-section-label">Første lag scorer</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px">
+        ${oddsField(mk,'fgHome',ha+' scorer først',saved)}
+        ${oddsField(mk,'fgAway',aa+' scorer først',saved)}
+      </div>
+
+      <div class="odds-section-label">Over mål</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:4px">
+        ${oddsField(mk,'o05','O 0.5',saved)}
+        ${oddsField(mk,'o15','O 1.5',saved)}
+        ${oddsField(mk,'o25','O 2.5',saved)}
+        ${oddsField(mk,'o35','O 3.5',saved)}
+        ${oddsField(mk,'o45','O 4.5',saved)}
+      </div>
+
+      <div class="odds-section-label">Under mål</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:4px">
+        ${oddsField(mk,'u05','U 0.5',saved)}
+        ${oddsField(mk,'u15','U 1.5',saved)}
+        ${oddsField(mk,'u25','U 2.5',saved)}
+        ${oddsField(mk,'u35','U 3.5',saved)}
+        ${oddsField(mk,'u45','U 4.5',saved)}
+      </div>
+
+      <div class="odds-section-label">1. omgang</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px">
+        ${oddsField(mk,'h1Goal','Mål i 1. omgang',saved)}
+        ${oddsField(mk,'h1NoGoal','Ingen mål 1. omg',saved)}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:4px">
+        ${oddsField(mk,'h1Home',ha+' leder HT',saved)}
+        ${oddsField(mk,'h1Draw','Likt HT',saved)}
+        ${oddsField(mk,'h1Away',aa+' leder HT',saved)}
+      </div>
+
+      <div class="odds-section-label">Spesial</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:14px">
+        ${oddsField(mk,'btts','Begge scorer',saved)}
+        ${oddsField(mk,'cleanH',ha+' nullen',saved)}
+        ${oddsField(mk,'cleanA',aa+' nullen',saved)}
+        ${oddsField(mk,'fg15','Mål ≤15 min',saved)}
+      </div>
+
+      <button class="btn btn-primary btn-full" onclick="saveMatchOdds('${mk}')">💾 Lagre — ${ha} vs ${aa}</button>
+    </div>`;
+  }
+
+  html+=`<button class="btn btn-full" style="margin-top:4px;margin-bottom:12px" onclick="oddsAdminUnlocked=false;renderOddsAdmin()">🔒 Lås admin</button>`;
+  el.innerHTML=html;
+}
+
+window.saveMatchOdds=async function(mk){
+  const FIELDS=['homeOdds','drawOdds','awayOdds','fgHome','fgAway','o05','u05','o15','u15','o25','u25','o35','u35','o45','u45','btts','cleanH','cleanA','h1Goal','h1NoGoal','h1Home','h1Draw','h1Away','fg15'];
+  const data={};
+  let hasAny=false;
+  for(const f of FIELDS){
+    const safeId=`odds-${mk}-${f}`.replace(/[^a-zA-Z0-9-_]/g,'_');
+    const inp=document.getElementById(safeId);
+    if(inp&&inp.value!==''){
+      const v=parseFloat(inp.value);
+      if(v>=1.01){ data[f]=Math.round(v*10)/10; hasAny=true; }
+    }
+  }
+  if(hasAny){ await set(ref(db,`config/manualOdds/${mk}`),data); showToast(`✅ Odds lagret for ${MATCHES[mk]?.label||mk}`); }
+  else{ await remove(ref(db,`config/manualOdds/${mk}`)); showToast(`Odds fjernet for ${MATCHES[mk]?.label||mk}`); }
+};
+
 function renderMatchButtons(){
   const list=Object.entries(MATCHES);
   ['tip-match-buttons','bet-match-buttons'].forEach(cid=>{
