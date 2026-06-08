@@ -272,9 +272,12 @@ select option{background:var(--bg3)}
 <header>
   <div class="header-top">
     <div class="logo">VM <span>@BEERGARDEN</span> 🍺</div>
-    <div class="sync-row">
-      <span class="dot" id="sync-dot"></span>
-      <span id="sync-label">Kobler til...</span>
+    <div style="display:flex;align-items:center;gap:10px">
+      <button onclick="showRules()" style="background:none;border:1px solid var(--border);border-radius:8px;color:var(--text2);font-size:12px;padding:3px 9px;cursor:pointer;font-family:inherit">Regler ?</button>
+      <div class="sync-row">
+        <span class="dot" id="sync-dot"></span>
+        <span id="sync-label">Kobler til...</span>
+      </div>
     </div>
   </div>
   <div class="tabs">
@@ -2097,29 +2100,7 @@ window.updatePayoutPreview = function(){
 };
 document.addEventListener('input', e=>{ if(e.target.id==='bet-stake') updatePayoutPreview(); });
 
-window.confirmBet = function(){
-  if(!pendingBet)return;
-  if(liveScores[pendingBet.matchKey]?.status==='FT'){ showToast('Kampen er ferdig – ingen nye bets! ✅'); cancelBet(); return; }
-  const pid = document.getElementById('bet-placer-sel').value;
-  const stake = parseInt(document.getElementById('bet-stake').value)||0;
-  if(!pid){ showToast('Velg spiller!'); return; }
-  if(stake<1){ showToast('Minst 1 token!'); return; }
-  if(stake>MAX_SINGLE_STAKE){ showToast(`Maks ${MAX_SINGLE_STAKE} tokens per bet!`); return; }
-  const remaining = getRemainingTokens(pid);
-  if(stake>remaining){ showToast(`${players[pid]?.name||'Spiller'} har bare ${remaining} tokens igjen!`); return; }
-  const payout = Math.round(stake * pendingBet.odds);
-  saveDeviceMapping(pid);
-  push(ref(db,'bets'),{
-    matchKey:pendingBet.matchKey,
-    matchLabel:BET_CATALOG[pendingBet.matchKey]?.home+'–'+BET_CATALOG[pendingBet.matchKey]?.away,
-    betId:pendingBet.betId, desc:pendingBet.betText, odds:pendingBet.odds,
-    stake, payout, placerId:pid, placerName:players[pid]?.name||'', status:'open', createdAt:Date.now()
-  });
-  document.getElementById('bet-place-panel').style.display='none';
-  pendingBet=null; parlayLegs=[];
-  showToast(`Bet plassert! ${stake} token${stake!==1?'s':''} satset 🎯`);
-  renderBetCatalog(); renderBets();
-};
+// confirmBet, confirmParlay and doPlaceBet defined at bottom of script
 window.cancelBet=function(){ document.getElementById('bet-place-panel').style.display='none'; pendingBet=null; parlayLegs=[]; renderBetCatalog(); };
 
 // ─── PARLAY SYSTEM ───
@@ -2165,38 +2146,7 @@ window.updateParlayPreview=function(){
   previewEl.innerHTML=`${stake} token${stake!==1?'s':''} inn → vinner du <strong style="color:var(--green)">${payout} token${payout!==1?'s':''}</strong>`;
 };
 
-window.confirmParlay=function(){
-  if(!parlayLegs.length)return;
-  for(const leg of parlayLegs){
-    if(liveScores[leg.matchKey]?.status==='FT'){showToast(`${leg.matchKey} er allerede ferdig!`);return;}
-  }
-  const pid=document.getElementById('parlay-placer-sel').value;
-  const stake=parseInt(document.getElementById('parlay-stake').value)||0;
-  if(!pid){showToast('Velg spiller!');return;}
-  if(stake<1){showToast('Minst 1 token!');return;}
-  if(stake>MAX_SINGLE_STAKE){showToast(`Maks ${MAX_SINGLE_STAKE} tokens per bet!`);return;}
-  const rem=getRemainingTokens(pid);
-  if(stake>rem){showToast(`${players[pid]?.name||''} har bare ${rem} tokens igjen!`);return;}
-  const combinedOdds=parseFloat(parlayLegs.reduce((a,l)=>a*l.odds,1).toFixed(2));
-  const payout=Math.round(stake*combinedOdds);
-  const legCount=parlayLegs.length;
-  saveDeviceMapping(pid);
-  push(ref(db,'bets'),{
-    isParlay:true,
-    legs:parlayLegs.map(l=>({matchKey:l.matchKey,betId:l.betId,desc:l.desc,odds:l.odds})),
-    matchKey:parlayLegs[0].matchKey,
-    matchLabel:parlayLegs.map(l=>getTeamAbbr(MATCHES[l.matchKey]?.home||'')+'+'+getTeamAbbr(MATCHES[l.matchKey]?.away||'')).join('/'),
-    betId:'parlay_'+Date.now(),
-    desc:parlayLegs.map(l=>l.desc).join(' + '),
-    odds:combinedOdds, stake, payout,
-    placerId:pid, placerName:players[pid]?.name||'',
-    status:'open', createdAt:Date.now()
-  });
-  parlayLegs=[];
-  document.getElementById('parlay-builder-panel').style.display='none';
-  showToast(`Parlay plassert! ${legCount} ben, odds ${combinedOdds}× 🔗`);
-  renderBetCatalog(); renderBets();
-};
+// confirmParlay defined at bottom of script
 
 window.cancelParlay=function(){
   parlayLegs=[];
@@ -2950,6 +2900,172 @@ detectDevicePlayer();
 // ─── TOAST ───
 function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.style.opacity='1'; clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.style.opacity='0',3000); }
 window.showToast=showToast;
+
+// ─── RULES MODAL ───
+window.showRules=function(){
+  document.getElementById('rules-modal').style.display='flex';
+};
+window.hideRules=function(){
+  document.getElementById('rules-modal').style.display='none';
+};
+
+// ─── BET CONFIRM ───
+let betPlacing=false;
+let pendingConfirm=null; // {type:'single'|'parlay'}
+
+window.confirmBet=function(){
+  if(!pendingBet)return;
+  if(liveScores[pendingBet.matchKey]?.status==='FT'){showToast('Kampen er ferdig – ingen nye bets! ✅');cancelBet();return;}
+  const pid=document.getElementById('bet-placer-sel').value;
+  const stake=parseInt(document.getElementById('bet-stake').value)||0;
+  if(!pid){showToast('Velg spiller!');return;}
+  if(stake<1){showToast('Minst 1 token!');return;}
+  if(stake>MAX_SINGLE_STAKE){showToast(`Maks ${MAX_SINGLE_STAKE} tokens per bet!`);return;}
+  const remaining=getRemainingTokens(pid);
+  if(stake>remaining){showToast(`${players[pid]?.name||'Spiller'} har bare ${remaining} tokens igjen!`);return;}
+  const payout=Math.round(stake*pendingBet.odds);
+  const needsConfirm=stake>=5||pendingBet.odds>=50;
+  if(needsConfirm){
+    document.getElementById('bet-confirm-desc').innerHTML=
+      `<div style="font-size:15px;font-weight:600;margin-bottom:4px">${pendingBet.betText}</div>
+       <div style="font-size:13px;color:var(--text2)">${stake} tokens til ${pendingBet.odds}× odds</div>
+       <div style="font-size:18px;font-weight:700;color:var(--green);margin-top:6px">Mulig gevinst: ${payout} tokens</div>`;
+    pendingConfirm={type:'single'};
+    document.getElementById('bet-confirm-modal').style.display='flex';
+    return;
+  }
+  doPlaceBet();
+};
+
+window.doPlaceBet=function(){
+  document.getElementById('bet-confirm-modal').style.display='none';
+  if(betPlacing)return;
+  if(pendingConfirm?.type==='parlay'){doPlaceParlay();pendingConfirm=null;return;}
+  pendingConfirm=null;
+  if(!pendingBet)return;
+  betPlacing=true;
+  const pid=document.getElementById('bet-placer-sel').value;
+  const stake=parseInt(document.getElementById('bet-stake').value)||0;
+  const payout=Math.round(stake*pendingBet.odds);
+  saveDeviceMapping(pid);
+  push(ref(db,'bets'),{
+    matchKey:pendingBet.matchKey,
+    matchLabel:BET_CATALOG[pendingBet.matchKey]?.home+'–'+BET_CATALOG[pendingBet.matchKey]?.away,
+    betId:pendingBet.betId,desc:pendingBet.betText,odds:pendingBet.odds,
+    stake,payout,placerId:pid,placerName:players[pid]?.name||'',status:'open',createdAt:Date.now()
+  }).then(()=>{betPlacing=false;});
+  document.getElementById('bet-place-panel').style.display='none';
+  pendingBet=null;parlayLegs=[];
+  showToast(`Bet plassert! ${stake} token${stake!==1?'s':''} satset 🎯`);
+  renderBetCatalog();renderBets();
+};
+
+window.confirmParlay=function(){
+  if(!parlayLegs.length)return;
+  for(const leg of parlayLegs){
+    if(liveScores[leg.matchKey]?.status==='FT'){showToast(`${leg.matchKey} er allerede ferdig!`);return;}
+  }
+  const pid=document.getElementById('parlay-placer-sel').value;
+  const stake=parseInt(document.getElementById('parlay-stake').value)||0;
+  if(!pid){showToast('Velg spiller!');return;}
+  if(stake<1){showToast('Minst 1 token!');return;}
+  if(stake>MAX_SINGLE_STAKE){showToast(`Maks ${MAX_SINGLE_STAKE} tokens per bet!`);return;}
+  const rem=getRemainingTokens(pid);
+  if(stake>rem){showToast(`${players[pid]?.name||''} har bare ${rem} tokens igjen!`);return;}
+  const combinedOdds=parseFloat(parlayLegs.reduce((a,l)=>a*l.odds,1).toFixed(2));
+  const payout=Math.round(stake*combinedOdds);
+  const needsConfirm=stake>=5||combinedOdds>=50;
+  if(needsConfirm){
+    document.getElementById('bet-confirm-desc').innerHTML=
+      `<div style="font-size:15px;font-weight:600;margin-bottom:4px">Parlay – ${parlayLegs.length} ben</div>
+       <div style="font-size:12px;color:var(--text2);margin-bottom:4px">${parlayLegs.map(l=>l.desc).join(' + ')}</div>
+       <div style="font-size:13px;color:var(--text2)">${stake} tokens til ${combinedOdds}× odds</div>
+       <div style="font-size:18px;font-weight:700;color:var(--green);margin-top:6px">Mulig gevinst: ${payout} tokens</div>`;
+    pendingConfirm={type:'parlay'};
+    document.getElementById('bet-confirm-modal').style.display='flex';
+    return;
+  }
+  doPlaceParlay();
+};
+
+function doPlaceParlay(){
+  if(betPlacing)return;
+  betPlacing=true;
+  const pid=document.getElementById('parlay-placer-sel').value;
+  const stake=parseInt(document.getElementById('parlay-stake').value)||0;
+  const combinedOdds=parseFloat(parlayLegs.reduce((a,l)=>a*l.odds,1).toFixed(2));
+  const payout=Math.round(stake*combinedOdds);
+  const legCount=parlayLegs.length;
+  saveDeviceMapping(pid);
+  push(ref(db,'bets'),{
+    isParlay:true,
+    legs:parlayLegs.map(l=>({matchKey:l.matchKey,betId:l.betId,desc:l.desc,odds:l.odds})),
+    matchKey:parlayLegs[0].matchKey,
+    matchLabel:parlayLegs.map(l=>getTeamAbbr(MATCHES[l.matchKey]?.home||'')+'+'+getTeamAbbr(MATCHES[l.matchKey]?.away||'')).join('/'),
+    betId:'parlay_'+Date.now(),
+    desc:parlayLegs.map(l=>l.desc).join(' + '),
+    odds:combinedOdds,stake,payout,
+    placerId:pid,placerName:players[pid]?.name||'',
+    status:'open',createdAt:Date.now()
+  }).then(()=>{betPlacing=false;});
+  parlayLegs=[];
+  document.getElementById('parlay-builder-panel').style.display='none';
+  showToast(`Parlay plassert! ${legCount} ben, odds ${combinedOdds}× 🔗`);
+  renderBetCatalog();renderBets();
+}
+
+window.hideBetConfirm=function(){
+  document.getElementById('bet-confirm-modal').style.display='none';
+  pendingConfirm=null;
+};
 </script>
+
+<!-- ─── RULES MODAL ─── -->
+<div id="rules-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.75);align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)hideRules()">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:1.25rem;max-width:420px;width:100%;max-height:85vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:1px">Regler</div>
+      <button onclick="hideRules()" style="background:none;border:none;color:var(--text2);font-size:22px;cursor:pointer;line-height:1">×</button>
+    </div>
+
+    <div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:6px">🏆 Tippekonk</div>
+    <div style="font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:14px">
+      Tips: utfall (H/U/B), eksakt stilling, og fire bonuser.<br>
+      <strong style="color:var(--text)">Eksakt stilling = 7p · Riktig forskjell = 5p · Riktig H/U/B = 3p</strong><br>
+      Bonuser (1p hver): første lag som scorer, mål i 1. omgang, over/under 2,5 mål, begge lag scorer.<br>
+      Maks <strong style="color:var(--text)">11p</strong> per kamp. Poeng beregnes automatisk fra livescore.
+    </div>
+
+    <div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:6px">🃏 Oddsen</div>
+    <div style="font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:14px">
+      Alle starter med <strong style="color:var(--text)">20 tokens</strong>. Maks <strong style="color:var(--text)">10 tokens</strong> per bet.<br>
+      Velg en bet, sett innsats og plasser. Gevinst = innsats × odds.<br>
+      Kombiner flere bets til en <strong style="color:var(--text)">parlay</strong> for multiplisert odds – én feil bein og hele parlayden taper.<br>
+      Tokens vunnet <strong style="color:var(--text)">kan ikke</strong> brukes til nye bets.<br>
+      <span style="color:var(--red);font-weight:600">⚠️ Bets kan ikke slettes etter plassering!</span>
+    </div>
+
+    <div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:6px">📱 Enhetsgjenkjenning</div>
+    <div style="font-size:14px;color:var(--text2);line-height:1.6">
+      Appen husker hvem du er på denne enheten. Bruk <strong style="color:var(--text)">Bytt spiller</strong> i Min oversikt om feil person er valgt.
+    </div>
+  </div>
+</div>
+
+<!-- ─── BET CONFIRM MODAL ─── -->
+<div id="bet-confirm-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.75);align-items:center;justify-content:center;padding:16px">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:1.25rem;max-width:360px;width:100%">
+    <div style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:10px">Bekreft bet</div>
+    <div id="bet-confirm-desc" style="margin-bottom:12px"></div>
+    <div style="background:var(--red-light);border:1px solid var(--red-dark);border-radius:8px;padding:8px 10px;font-size:13px;color:var(--red);margin-bottom:14px">
+      ⚠️ Bets kan <strong>ikke</strong> slettes etter plassering!
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary" style="flex:1" onclick="doPlaceBet()">Ja, plasser</button>
+      <button class="btn" onclick="hideBetConfirm()">Avbryt</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
