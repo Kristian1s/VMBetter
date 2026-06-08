@@ -1333,7 +1333,7 @@ const HARDCODED_ODDS = {
     h1Goal:1.55, h1NoGoal:4.30,
     btts:2.70,
   },
-  'NOR-IRQ': {
+  'IRQ-NOR': {
     // Norway 1.22×, Draw 6.25×, Iraq 12.00× — O/U 2.5: 1.61×/2.36×
     homeOdds:1.22, drawOdds:6.25, awayOdds:12.0,
     lambdaH:2.50, lambdaA:0.70,        // μ=3.20, matches Over 2.5 = 62%
@@ -1417,7 +1417,7 @@ function generateBetCatalog(mk, home, away, homeKey, awayKey, fetchedOdds){
   for(let h=0;h<=5;h++) for(let a=0;a<=5;a++){
     const key=`${h}-${a}`;
     const label=h>a?`${h}–${a} til ${ha}`:a>h?`${h}–${a} til ${aa}`:`${h}–${a} uavgjort`;
-    exactBets.push({id:`res-${h}${a}`,h,a,text:label,odds:exactOdds[key]||100,
+    exactBets.push({id:`res-${h}${a}`,h,a,text:label,odds:exactOdds[key]||300,
       resolve:(s,ev,ht,fin)=>fin?s.homeGoals===h&&s.awayGoals===a:null});
   }
 
@@ -1663,7 +1663,7 @@ function computeExactScoreOdds(λH,λA){
   const odds={};
   for(let h=0;h<=5;h++) for(let a=0;a<=5;a++){
     const p=poissonP(h,λH)*poissonP(a,λA);
-    odds[`${h}-${a}`]=p>0?Math.min(100,Math.round((1/p)*MARGIN*2)/2):100;
+    odds[`${h}-${a}`]=p>0?Math.min(300,Math.round((1/p)*MARGIN*2)/2):300;
   }
   return odds;
 }
@@ -2335,8 +2335,8 @@ function renderStats(){
 
   // ── Personality cards ──
   const TRAITS=[
-    {emoji:'🌅',title:'Optimisten',    desc:'Alltid på outsider',        color:'var(--amber)', minBets:2, metric:s=>s.avgOdds,       fmt:s=>`snitt ${s.avgOdds}×`},
-    {emoji:'☁️', title:'Pessimisten',  desc:'Spiller bare på favoritter',color:'var(--blue)',  minBets:2, metric:s=>-s.avgOdds,      fmt:s=>`snitt ${s.avgOdds}×`},
+    {emoji:'🌅',title:'Optimisten',    desc:'Alltid på outsider',        color:'var(--amber)', minBets:1, metric:s=>s.avgOdds,       fmt:s=>`snitt ${s.avgOdds}×`},
+    {emoji:'☁️', title:'Pessimisten',  desc:'Spiller bare på favoritter',color:'var(--blue)',  minBets:1, metric:s=>-s.avgOdds,      fmt:s=>`snitt ${s.avgOdds}×`},
     {emoji:'🃏', title:'Parlay-kongen',desc:'Kombinerer alt',             color:'#a78bfa',     minBets:1, metric:s=>s.parlayCount,   fmt:s=>`${s.parlayCount} parlays`},
     {emoji:'🎯', title:'Skarpskytteren',desc:'Treffer nesten alltid',     color:'var(--green)', minBets:3, metric:s=>s.winRate,       fmt:s=>`${s.winRate}% treffratio`},
     {emoji:'😬', title:'Motbakkene',   desc:'Aldri riktig timing',        color:'var(--red)',   minBets:3, metric:s=>-s.winRate,      fmt:s=>`${s.winRate}% treffratio`},
