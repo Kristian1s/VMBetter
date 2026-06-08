@@ -442,6 +442,7 @@ select option{background:var(--bg3)}
 </div>
 <div id="toast"></div>
 
+<script src="wc2026.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, set, push, update, remove } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
@@ -621,22 +622,27 @@ function renderAdminPlayers(){
   document.getElementById('match-admin-panel').innerHTML=`<div class="card" style="margin-bottom:12px;border-color:var(--blue)">
     <div class="card-label">⚽ Kamper${doneCount?` <span style="font-size:10px;color:var(--text3);font-weight:400">(${doneCount} ferdig skjult)</span>`:''}</div>
     ${activeEntries.length ? matchRows : emptyMsg}
-    <button class="btn btn-sm" style="margin-top:8px;width:100%" onclick="document.getElementById('add-match-form').style.display=document.getElementById('add-match-form').style.display==='none'?'block':'none'">+ Legg til kamp</button>
+    <button class="btn btn-sm" style="margin-top:8px;width:100%" onclick="const f=document.getElementById('add-match-form');f.style.display=f.style.display==='none'?'block':'none';if(f.style.display==='block')renderWCPicker(wcPickerFilter)">+ Legg til kamp</button>
     <div id="add-match-form" style="display:none;margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
-      <select id="add-match-league" style="margin-bottom:8px;font-size:13px;width:100%">
-        <option value="fifa.world">VM 2026 (fifa.world)</option>
-        <option value="fifa.friendly">Vennekamp (fifa.friendly)</option>
-        <option value="uefa.euro_q">EM-kval</option>
-        <option value="concacaf.world-q">CONCACAF kval</option>
-        <option value="eng.1">Premier League</option>
-        <option value="esp.1">La Liga</option>
-        <option value="ger.1">Bundesliga</option>
-      </select>
-      <div style="display:flex;gap:8px">
-        <input type="number" id="add-match-id" placeholder="ESPN event ID" style="flex:1">
-        <button class="btn btn-primary" onclick="fetchAndAddMatch()">Hent</button>
+      <div id="wc-picker-wrap">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+          ${['Alle','A','B','C','D','E','F','G','H','I','J','K','L','R32','R16','QF','SF','F'].map(g=>`<button class="btn btn-sm" style="font-size:11px;padding:2px 7px" onclick="renderWCPicker('${g}')">${g==='Alle'?'Alle grupper':g}</button>`).join('')}
+        </div>
+        <div id="wc-match-list" style="max-height:260px;overflow-y:auto;font-size:13px"></div>
       </div>
-      <div style="font-size:11px;color:var(--text3);margin-top:5px">Finn ID på espn.com — siste tall i kampens URL</div>
+      <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:4px">Annen kamp (ESPN ID):</div>
+        <select id="add-match-league" style="margin-bottom:6px;font-size:12px;width:100%">
+          <option value="fifa.world">VM 2026</option>
+          <option value="fifa.friendly">Vennekamp</option>
+          <option value="uefa.euro_q">EM-kval</option>
+          <option value="eng.1">Premier League</option>
+        </select>
+        <div style="display:flex;gap:8px">
+          <input type="number" id="add-match-id" placeholder="ESPN event ID" style="flex:1;font-size:12px">
+          <button class="btn btn-primary btn-sm" onclick="fetchAndAddMatch()">Hent</button>
+        </div>
+      </div>
     </div>
   </div>`;
 
@@ -1501,6 +1507,54 @@ function renderMatchButtons(){
     if(sel)document.getElementById((isBet?'bet-match-btn':'match-btn')+'-'+sel)?.classList.add('selected');
   });
 }
+
+// ─── WC MATCH PICKER ───
+let wcPickerFilter='I';
+window.renderWCPicker=function(filter=wcPickerFilter){
+  wcPickerFilter=filter;
+  const el=document.getElementById('wc-match-list'); if(!el)return;
+  // Determine which ESPN IDs are already added (match by espnId field)
+  const addedIds=new Set(Object.values(MATCHES).map(m=>String(m.espnId)));
+  const list=filter==='Alle'?WC2026:WC2026.filter(m=>m.group===filter||m.round===filter);
+  if(!list.length){el.innerHTML='<div style="color:var(--text3);padding:4px">Ingen kamper</div>';return;}
+  // Group by date
+  const byDate={};
+  list.forEach(m=>{ (byDate[m.date]||(byDate[m.date]=[])).push(m); });
+  el.innerHTML=Object.entries(byDate).sort(([a],[b])=>a.localeCompare(b)).map(([date,matches])=>{
+    const d=new Date(date); const label=d.toLocaleDateString('no',{weekday:'short',day:'numeric',month:'short'});
+    const rows=matches.map(m=>{
+      const added=addedIds.has(String(m.id));
+      const tag=m.group?`<span style="font-size:10px;color:var(--text3)">Gr.${m.group}</span>`
+                       :`<span style="font-size:10px;color:var(--text3)">${m.round}</span>`;
+      const isTBD=m.home==='TBD';
+      const nameH=isTBD?'TBD':m.home; const nameA=isTBD?'TBD':m.away;
+      return `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--border)">
+        ${tag}
+        <span style="flex:1;${added?'color:var(--text3)':''}">${teamFlag(nameH)}${nameH} – ${teamFlag(nameA)}${nameA}</span>
+        ${added
+          ? `<span style="color:var(--green);font-size:12px">✓</span>`
+          : `<button class="btn btn-sm btn-primary" style="font-size:11px;padding:2px 8px" onclick="addWCMatch('${m.id}')">+</button>`}
+      </div>`;
+    }).join('');
+    return `<div style="font-size:11px;color:var(--text2);font-weight:600;padding:4px 0 2px">${label}</div>${rows}`;
+  }).join('');
+};
+
+window.addWCMatch=async function(espnId){
+  const btn=event?.target; if(btn){btn.textContent='…';btn.disabled=true;}
+  const s=await fetchESPN('fifa.world',parseInt(espnId));
+  if(!s){showToast('Fant ikke kampen ⚠️');if(btn){btn.textContent='+';btn.disabled=false;}return;}
+  const ha=getTeamAbbr(s.home), aa=getTeamAbbr(s.away);
+  const mk=`${ha}-${aa}`;
+  const matchData={label:`${ha} – ${aa}`,home:s.home,away:s.away,homeKey:s.home.toLowerCase(),awayKey:s.away.toLowerCase(),espnId:parseInt(espnId),espnLeague:'fifa.world',sofaId:null,fixtureId:null};
+  await set(ref(db,`config/matches/${mk}`),matchData);
+  showToast(`${ha} – ${aa} lagt til ✅`);
+  renderWCPicker(wcPickerFilter);
+  if(oddsApiKey){
+    const fetched=await fetchOddsForMatch(s.home,s.away,oddsApiKey);
+    if(fetched){await update(ref(db,`config/matches/${mk}`),{fetchedOdds:fetched});showToast(`Odds oppdatert for ${ha} – ${aa} ✅`);}
+  }
+};
 
 // ─── ADMIN MATCH MANAGEMENT ───
 window.fetchAndAddMatch=async function(){
