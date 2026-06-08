@@ -1549,12 +1549,12 @@ async function fetchOddsForMatch(home, away, apiKey){
     const h2hMkt=preferred.markets?.find(m=>m.key==='h2h');
     const totalMkts=preferred.markets?.filter(m=>m.key==='totals')||[];
 
-    function oddsFor(name){ return h2hMkt?.outcomes?.find(o=>nameMatch(o.name,name))?.price; }
+    function oddsFor(name){ return h2hMkt?.outcomes?.find(o=>nameMatch(o.name,name))?.price??null; }
     let homeO=oddsFor(entry.home_team), awayO=oddsFor(entry.away_team);
-    const drawO=h2hMkt?.outcomes?.find(o=>o.name==='Draw')?.price;
+    const drawO=h2hMkt?.outcomes?.find(o=>o.name==='Draw')?.price??null;
     if(swapped)[homeO,awayO]=[awayO,homeO];
 
-    function getTotal(line,side){ return totalMkts.flatMap(m=>m.outcomes).find(o=>Math.abs(o.point-line)<0.1&&o.name===side)?.price; }
+    function getTotal(line,side){ return totalMkts.flatMap(m=>m.outcomes).find(o=>Math.abs(o.point-line)<0.1&&o.name===side)?.price??null; }
 
     return{
       homeOdds:homeO, drawOdds:drawO, awayOdds:awayO,
