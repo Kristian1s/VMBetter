@@ -1296,8 +1296,8 @@ window.submitTip=function(mk){
 };
 // ─── BET CATALOG ───
 // ─── TEAM FLAG / ABBR HELPERS ───
-const FLAG_MAP={'france':'fr','senegal':'sn','norway':'no','iraq':'iq','ireland':'ie','republic of ireland':'ie','qatar':'qa','england':'gb-eng','germany':'de','spain':'es','brazil':'br','argentina':'ar','portugal':'pt','netherlands':'nl','belgium':'be','croatia':'hr','morocco':'ma','united states':'us','usa':'us','mexico':'mx','canada':'ca','australia':'au','japan':'jp','south korea':'kr','korea republic':'kr','saudi arabia':'sa','turkey':'tr','switzerland':'ch','denmark':'dk','sweden':'se','poland':'pl','czechia':'cz','czech republic':'cz','ukraine':'ua','austria':'at','scotland':'gb-sct','wales':'gb-wls','south africa':'za','ghana':'gh','cameroon':'cm','nigeria':'ng','ivory coast':'ci','colombia':'co','chile':'cl','ecuador':'ec','peru':'pe','uruguay':'uy','iran':'ir','egypt':'eg','algeria':'dz','tunisia':'tn','russia':'ru','serbia':'rs','italy':'it','albania':'al','georgia':'ge','slovenia':'si','slovakia':'sk','finland':'fi','iceland':'is','greece':'gr','romania':'ro','hungary':'hu','new zealand':'nz','china':'cn','united arab emirates':'ae','indonesia':'id','venezuela':'ve','paraguay':'py','bolivia':'bo','kenya':'ke','mali':'ml','senegal':'sn','mali':'ml'};
-const ABBR_MAP={'france':'FRA','senegal':'SEN','norway':'NOR','iraq':'IRQ','ireland':'IRL','republic of ireland':'IRL','qatar':'QAT','england':'ENG','germany':'GER','spain':'ESP','brazil':'BRA','argentina':'ARG','portugal':'POR','netherlands':'NED','belgium':'BEL','croatia':'CRO','morocco':'MAR','united states':'USA','usa':'USA','mexico':'MEX','canada':'CAN','australia':'AUS','japan':'JPN','south korea':'KOR','korea republic':'KOR','saudi arabia':'KSA','turkey':'TUR','switzerland':'SUI','denmark':'DEN','sweden':'SWE','poland':'POL','czechia':'CZE','czech republic':'CZE','ukraine':'UKR','austria':'AUT','scotland':'SCO','wales':'WAL','south africa':'RSA','ghana':'GHA','cameroon':'CMR','nigeria':'NGA','ivory coast':'CIV','colombia':'COL','chile':'CHI','ecuador':'ECU','peru':'PER','uruguay':'URU','iran':'IRN','egypt':'EGY','algeria':'ALG','tunisia':'TUN','russia':'RUS','serbia':'SRB','italy':'ITA','albania':'ALB','georgia':'GEO','slovenia':'SVN','slovakia':'SVK','finland':'FIN','iceland':'ISL','greece':'GRE','romania':'ROU','hungary':'HUN','new zealand':'NZL','china':'CHN','united arab emirates':'UAE','indonesia':'IDN','venezuela':'VEN','paraguay':'PAR','bolivia':'BOL', 'Paris Saint-Germain':'PSG', 'Arsenal': 'ARS'};
+const FLAG_MAP={'france':'fr','senegal':'sn','norway':'no','iraq':'iq','northern ireland':'gb-nir','ireland':'ie','republic of ireland':'ie','qatar':'qa','england':'gb-eng','germany':'de','spain':'es','brazil':'br','argentina':'ar','portugal':'pt','netherlands':'nl','belgium':'be','croatia':'hr','morocco':'ma','united states':'us','usa':'us','mexico':'mx','canada':'ca','australia':'au','japan':'jp','south korea':'kr','korea republic':'kr','saudi arabia':'sa','turkey':'tr','switzerland':'ch','denmark':'dk','sweden':'se','poland':'pl','czechia':'cz','czech republic':'cz','ukraine':'ua','austria':'at','scotland':'gb-sct','wales':'gb-wls','south africa':'za','ghana':'gh','cameroon':'cm','nigeria':'ng','ivory coast':'ci','colombia':'co','chile':'cl','ecuador':'ec','peru':'pe','uruguay':'uy','iran':'ir','egypt':'eg','algeria':'dz','tunisia':'tn','russia':'ru','serbia':'rs','italy':'it','albania':'al','georgia':'ge','slovenia':'si','slovakia':'sk','finland':'fi','iceland':'is','greece':'gr','romania':'ro','hungary':'hu','new zealand':'nz','china':'cn','united arab emirates':'ae','indonesia':'id','venezuela':'ve','paraguay':'py','bolivia':'bo','kenya':'ke','mali':'ml','senegal':'sn','mali':'ml'};
+const ABBR_MAP={'france':'FRA','senegal':'SEN','norway':'NOR','iraq':'IRQ','northern ireland':'NIR','ireland':'IRL','republic of ireland':'IRL','qatar':'QAT','england':'ENG','germany':'GER','spain':'ESP','brazil':'BRA','argentina':'ARG','portugal':'POR','netherlands':'NED','belgium':'BEL','croatia':'CRO','morocco':'MAR','united states':'USA','usa':'USA','mexico':'MEX','canada':'CAN','australia':'AUS','japan':'JPN','south korea':'KOR','korea republic':'KOR','saudi arabia':'KSA','turkey':'TUR','switzerland':'SUI','denmark':'DEN','sweden':'SWE','poland':'POL','czechia':'CZE','czech republic':'CZE','ukraine':'UKR','austria':'AUT','scotland':'SCO','wales':'WAL','south africa':'RSA','ghana':'GHA','cameroon':'CMR','nigeria':'NGA','ivory coast':'CIV','colombia':'COL','chile':'CHI','ecuador':'ECU','peru':'PER','uruguay':'URU','iran':'IRN','egypt':'EGY','algeria':'ALG','tunisia':'TUN','russia':'RUS','serbia':'SRB','italy':'ITA','albania':'ALB','georgia':'GEO','slovenia':'SVN','slovakia':'SVK','finland':'FIN','iceland':'ISL','greece':'GRE','romania':'ROU','hungary':'HUN','new zealand':'NZL','china':'CHN','united arab emirates':'UAE','indonesia':'IDN','venezuela':'VEN','paraguay':'PAR','bolivia':'BOL', 'Paris Saint-Germain':'PSG', 'Arsenal': 'ARS'};
 function teamFlag(name){
   if(!name)return'';
   const n=name.toLowerCase();
@@ -1513,24 +1513,26 @@ window.removeMatch=function(mk){
 };
 // ─── ODDS API FETCH ───
 async function fetchOddsForMatch(home, away, apiKey){
-  const SPORT='soccer_fifa_world_cup';
-  const url=`https://api.the-odds-api.com/v4/sports/${SPORT}/odds/?apiKey=${apiKey}&regions=eu&markets=h2h,totals&oddsFormat=decimal`;
+  const SPORTS=['soccer_fifa_world_cup','soccer_friendly_international','soccer_uefa_nations_league','soccer_uefa_euro_qualification','soccer_fifa_world_cup_qualification_europe'];
   const proxy='https://corsproxy.io/?url=';
+  function nameMatch(a,b){ a=a.toLowerCase().replace(/[^a-z]/g,''); b=b.toLowerCase().replace(/[^a-z]/g,''); return a.includes(b.substring(0,4))||b.includes(a.substring(0,4)); }
+  let entry=null;
   try{
-    const res=await Promise.race([
-      fetch(proxy+encodeURIComponent(url)),
-      new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),8000))
-    ]);
-    if(!res.ok)return null;
-    const data=await res.json();
-    if(!Array.isArray(data))return null;
-
-    // Find the right match by fuzzy team name matching
-    function nameMatch(a,b){ a=a.toLowerCase().replace(/[^a-z]/g,''); b=b.toLowerCase().replace(/[^a-z]/g,''); return a.includes(b.substring(0,4))||b.includes(a.substring(0,4)); }
-    const entry=data.find(m=>
-      (nameMatch(m.home_team,home)&&nameMatch(m.away_team,away))||
-      (nameMatch(m.home_team,away)&&nameMatch(m.away_team,home))
-    );
+    for(const SPORT of SPORTS){
+      const url=`https://api.the-odds-api.com/v4/sports/${SPORT}/odds/?apiKey=${apiKey}&regions=eu&markets=h2h,totals&oddsFormat=decimal`;
+      const res=await Promise.race([
+        fetch(proxy+encodeURIComponent(url)),
+        new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),8000))
+      ]);
+      if(!res.ok)continue;
+      const data=await res.json();
+      if(!Array.isArray(data))continue;
+      entry=data.find(m=>
+        (nameMatch(m.home_team,home)&&nameMatch(m.away_team,away))||
+        (nameMatch(m.home_team,away)&&nameMatch(m.away_team,home))
+      );
+      if(entry)break;
+    }
     if(!entry)return null;
 
     // Determine if teams are swapped (Odds API home != our home)
