@@ -2319,56 +2319,54 @@ function renderStats(){
   const playerList=Object.entries(players);
   if(!playerList.length){ el.innerHTML='<div style="padding:2rem;color:var(--text3);font-size:24px;text-align:center">Ingen spillere ennå</div>'; return; }
 
-  // ── Per-player computed stats ──
+  // ── Per-player stats (all bets including parlays) ──
   function pStats(pid){
-    const pb=Object.values(bets).filter(b=>b.placerId===pid&&!b.isParlay);
-    const parlays=Object.values(bets).filter(b=>b.placerId===pid&&b.isParlay);
-    const total=pb.length; const won=pb.filter(b=>b.status==='won').length;
-    const lost=pb.filter(b=>b.status==='lost').length;
-    const staked=getTokensSpent(pid); const paidOut=getTokensWon(pid);
-    const biggestPayout=Math.max(0,...pb.filter(b=>b.status==='won').map(b=>b.payout||0));
-    const avgOdds=total?parseFloat((pb.reduce((s,b)=>s+(b.odds||1),0)/total).toFixed(2)):0;
+    const all=Object.values(bets).filter(b=>b.placerId===pid);
+    const singles=all.filter(b=>!b.isParlay);
+    const parlays=all.filter(b=>b.isParlay);
+    const total=all.length;
+    const won=all.filter(b=>b.status==='won').length;
     const winRate=total?Math.round(won/total*100):0;
-    const tipPts=getLiveTipPoints(pid);
-    const bal=getTokenBalance(pid);
-    return{total,won,lost,staked,paidOut,biggestPayout,avgOdds,winRate,tipPts,bal,parlayCount:parlays.length};
+    const biggestPayout=Math.max(0,...all.filter(b=>b.status==='won').map(b=>b.payout||0));
+    const avgOdds=total?parseFloat((all.reduce((s,b)=>s+(b.odds||1),0)/total).toFixed(1)):0;
+    return{total,won,winRate,biggestPayout,avgOdds,parlayCount:parlays.length,singlesCount:singles.length};
   }
   const stats=Object.fromEntries(playerList.map(([id])=>[id,pStats(id)]));
 
-  // ── Awards ──
-  function awardCard(emoji,title,subtitle,pid,statVal,color='var(--amber)'){
-    const p=players[pid]; if(!p)return'';
+  // ── Personality cards ──
+  const TRAITS=[
+    {emoji:'🌅',title:'Optimisten',    desc:'Alltid på outsider',        color:'var(--amber)', minBets:2, metric:s=>s.avgOdds,       fmt:s=>`snitt ${s.avgOdds}×`},
+    {emoji:'☁️', title:'Pessimisten',  desc:'Spiller bare på favoritter',color:'var(--blue)',  minBets:2, metric:s=>-s.avgOdds,      fmt:s=>`snitt ${s.avgOdds}×`},
+    {emoji:'🃏', title:'Parlay-kongen',desc:'Kombinerer alt',             color:'#a78bfa',     minBets:1, metric:s=>s.parlayCount,   fmt:s=>`${s.parlayCount} parlays`},
+    {emoji:'🎯', title:'Skarpskytteren',desc:'Treffer nesten alltid',     color:'var(--green)', minBets:3, metric:s=>s.winRate,       fmt:s=>`${s.winRate}% treffratio`},
+    {emoji:'😬', title:'Motbakkene',   desc:'Aldri riktig timing',        color:'var(--red)',   minBets:3, metric:s=>-s.winRate,      fmt:s=>`${s.winRate}% treffratio`},
+    {emoji:'🍀', title:'Heldiggrisen', desc:'Største enkeltgevinst',      color:'var(--gold)',  minBets:1, metric:s=>s.biggestPayout, fmt:s=>`+${s.biggestPayout}T gevinst`},
+    {emoji:'🏃', title:'Aktivisten',   desc:'Aldri et ledig øyeblikk',   color:'var(--text2)', minBets:1, metric:s=>s.total,         fmt:s=>`${s.total} bets plassert`},
+  ];
+
+  function personalityCard(trait, pid){
+    const p=players[pid]; const s=stats[pid]; if(!p)return'';
     const av=p.avatar?.startsWith('data:')
       ?`<img src="${p.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
-      :`<span style="font-size:28px;font-weight:700">${p.name.charAt(0).toUpperCase()}</span>`;
-    return`<div class="tv-card" style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:1rem;gap:8px">
-      <div style="font-size:40px;line-height:1">${emoji}</div>
-      <div style="font-size:16px;font-weight:700;color:${color};letter-spacing:.06em;text-transform:uppercase">${title}</div>
-      <div style="width:64px;height:64px;border-radius:50%;background:var(--bg4);display:flex;align-items:center;justify-content:center;overflow:hidden;border:2px solid ${color}">${av}</div>
-      <div style="font-size:26px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">${p.name}</div>
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:1px;color:${color};line-height:1">${statVal}</div>
-      <div style="font-size:14px;color:var(--text3)">${subtitle}</div>
+      :`<span style="font-size:24px;font-weight:700">${p.name.charAt(0).toUpperCase()}</span>`;
+    return`<div class="tv-card" style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:.9rem;gap:5px">
+      <div style="font-size:32px;line-height:1">${trait.emoji}</div>
+      <div style="font-size:11px;font-weight:700;color:${trait.color};letter-spacing:.07em;text-transform:uppercase;line-height:1.2">${trait.title}</div>
+      <div style="width:48px;height:48px;border-radius:50%;background:var(--bg4);display:flex;align-items:center;justify-content:center;overflow:hidden;border:2px solid ${trait.color};flex-shrink:0">${av}</div>
+      <div style="font-size:16px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%">${p.name}</div>
+      <div style="font-size:13px;color:${trait.color};font-weight:600">${trait.fmt(s)}</div>
+      <div style="font-size:11px;color:var(--text3)">${trait.desc}</div>
     </div>`;
   }
 
-  // Find award winners
-  const withBets=playerList.filter(([id])=>stats[id].total>=1);
-  const withWins=playerList.filter(([id])=>stats[id].won>=1);
-  const tipLeader=playerList.sort((a,b)=>stats[b[0]].tipPts-stats[a[0]].tipPts)[0];
-  const richest=playerList.sort((a,b)=>stats[b[0]].bal-stats[a[0]].bal)[0];
-  const oracle=withWins.sort((a,b)=>stats[b[0]].won-stats[a[0]].won)[0];
-  const highRoller=withBets.filter(([id])=>stats[id].total>=2).sort((a,b)=>stats[b[0]].avgOdds-stats[a[0]].avgOdds)[0]||withBets[0];
-  const biggestWinBet=Object.values(bets).filter(b=>b.status==='won').sort((a,b)=>(b.payout||0)-(a.payout||0))[0];
-  const sharpest=withBets.filter(([id])=>stats[id].total>=2).sort((a,b)=>stats[b[0]].winRate-stats[a[0]].winRate)[0]||withBets[0];
+  const personalityCards=TRAITS.map(t=>{
+    const eligible=playerList.filter(([id])=>stats[id].total>=t.minBets);
+    if(!eligible.length)return'';
+    const winner=[...eligible].sort((a,b)=>t.metric(stats[b[0]])-t.metric(stats[a[0]]))[0];
+    return personalityCard(t,winner[0]);
+  }).filter(Boolean);
 
-  const awards=[
-    tipLeader?awardCard('🎯','Tippekonk Leder','mest poeng totalt',tipLeader[0],`${stats[tipLeader[0]].tipPts}p`,'var(--blue)'):'',
-    richest?awardCard('💰','Rikeste','token-saldo',richest[0],`${stats[richest[0]].bal}T`,'var(--green)'):'',
-    oracle?awardCard('🔮','Orakelet','flest bets vunnet',oracle[0],`${stats[oracle[0]].won} treff`,'var(--amber)'):'',
-    sharpest&&stats[sharpest[0]].total>=2?awardCard('🏹','Skarpest','best treffratio',sharpest[0],`${stats[sharpest[0]].winRate}%`,'var(--green)'):'',
-    highRoller&&stats[highRoller[0]].total>=1?awardCard('🎲','High Roller','høyest snitt-odds',highRoller[0],`${stats[highRoller[0]].avgOdds}×`,'var(--red)'):'',
-    biggestWinBet?awardCard('💥','Beste Bet',biggestWinBet.desc.substring(0,28),biggestWinBet.placerId||Object.keys(players).find(id=>players[id]?.name===biggestWinBet.placerName)||playerList[0]?.[0],`+${biggestWinBet.payout}T`,'var(--gold)'):'',
-  ].filter(Boolean);
+  const awards=personalityCards; // kept as alias for layout below
 
   // ── Win-rate bars ──
   const sortedByWinRate=[...playerList].filter(([id])=>stats[id].total>0).sort((a,b)=>stats[b[0]].winRate-stats[a[0]].winRate);
@@ -2425,25 +2423,50 @@ function renderStats(){
   const totalWon=Object.values(bets).filter(b=>b.status==='won').reduce((s,b)=>s+(b.payout||0),0);
   const overallWinRate=totalBets?Math.round(Object.values(bets).filter(b=>b.status==='won').length/totalBets*100):0;
 
-  el.innerHTML=`<div style="padding:1.25rem;display:flex;flex-direction:column;gap:14px;">
+  // ── Compact player table ──
+  const tableRows=[...playerList].sort((a,b)=>stats[b[0]].total-stats[a[0]].total).map(([id,p])=>{
+    const s=stats[id];
+    const col=s.total<3?'var(--text3)':s.winRate>=60?'var(--green)':s.winRate>=35?'var(--amber)':'var(--red)';
+    return`<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:7px 8px;font-size:14px;font-weight:600">${p.name}</td>
+      <td style="padding:7px 8px;text-align:center;font-size:13px;color:var(--text2)">${s.total}</td>
+      <td style="padding:7px 8px;text-align:center;font-size:13px;color:${col};font-weight:600">${s.total?s.winRate+'%':'–'}</td>
+      <td style="padding:7px 8px;text-align:center;font-size:13px;color:var(--amber)">${s.avgOdds?s.avgOdds+'×':'–'}</td>
+      <td style="padding:7px 8px;text-align:center;font-size:13px;color:var(--gold)">${s.biggestPayout?'+'+s.biggestPayout+'T':'–'}</td>
+    </tr>`;
+  }).join('');
 
-    ${awards.length?`<div style="display:grid;grid-template-columns:repeat(${Math.min(awards.length,6)},1fr);gap:14px">${awards.join('')}</div>`:''}
+  el.innerHTML=`<div style="padding:1rem;display:flex;flex-direction:column;gap:12px;">
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-      <div class="tv-card">
-        <div class="tv-title" style="font-size:20px;margin-bottom:.75rem">📈 Treffratio per spiller</div>
-        ${sortedByWinRate.length?winRateRows:`<div style="color:var(--text3);font-size:20px">Ingen bets ennå</div>`}
+    ${awards.length?`
+    <div>
+      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:8px">Personligheter</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px">${awards.join('')}</div>
+    </div>`:''}
+
+    <div class="tv-card" style="padding:.75rem">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:6px">Spilleroversikt</div>
+      <table style="width:100%;border-collapse:collapse">
+        <thead><tr style="border-bottom:1px solid var(--border)">
+          <th style="padding:4px 8px;text-align:left;font-size:11px;color:var(--text3);font-weight:600">Spiller</th>
+          <th style="padding:4px 8px;text-align:center;font-size:11px;color:var(--text3);font-weight:600">Bets</th>
+          <th style="padding:4px 8px;text-align:center;font-size:11px;color:var(--text3);font-weight:600">Treffratio</th>
+          <th style="padding:4px 8px;text-align:center;font-size:11px;color:var(--text3);font-weight:600">Snitt odds</th>
+          <th style="padding:4px 8px;text-align:center;font-size:11px;color:var(--text3);font-weight:600">Beste gevinst</th>
+        </tr></thead>
+        <tbody>${tableRows||`<tr><td colspan="5" style="padding:12px;text-align:center;color:var(--text3)">Ingen bets ennå</td></tr>`}</tbody>
+      </table>
+    </div>
+
+    <div class="tv-card" style="padding:.75rem">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);margin-bottom:8px">Bet-kategorier</div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;font-size:13px;color:var(--text2)">
+        <span>Totalt: <strong style="color:var(--text)">${totalBets} bets</strong></span>
+        <span>Tokens satset: <strong style="color:var(--text)">${totalTokensWagered}T</strong></span>
+        <span>Tokens delt ut: <strong style="color:var(--green)">${totalWon}T</strong></span>
+        <span>Treffratio: <strong style="color:${overallWinRate>=50?'var(--green)':'var(--amber)'}">${overallWinRate}%</strong></span>
       </div>
-      <div class="tv-card">
-        <div class="tv-title" style="font-size:20px;margin-bottom:.75rem">🃏 Bet-kategorier</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;margin-bottom:12px">
-          <div style="font-size:18px;color:var(--text2)">Totale bets: <strong style="color:var(--text)">${totalBets}</strong></div>
-          <div style="font-size:18px;color:var(--text2)">Tokens satset: <strong style="color:var(--text)">${totalTokensWagered}T</strong></div>
-          <div style="font-size:18px;color:var(--text2)">Tokens delt ut: <strong style="color:var(--green)">${totalWon}T</strong></div>
-          <div style="font-size:18px;color:var(--text2)">Treffratio: <strong style="color:${overallWinRate>=50?'var(--green)':'var(--amber)'}">${overallWinRate}%</strong></div>
-        </div>
-        ${catRows||`<div style="color:var(--text3);font-size:20px">Ingen bets ennå</div>`}
-      </div>
+      ${catRows||`<div style="color:var(--text3);font-size:14px">Ingen bets ennå</div>`}
     </div>
 
   </div>`;
