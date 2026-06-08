@@ -1488,18 +1488,20 @@ window.fetchAndAddMatch=async function(){
   showToast('Henter kamp fra ESPN...');
   const s=await fetchESPN(league,espnId);
   if(!s){showToast('Fant ikke kampen – sjekk ID og league ⚠️');return;}
-  const mk=`${getTeamAbbr(s.home)}-${getTeamAbbr(s.away)}`;
-  const matchData={label:`${getTeamAbbr(s.home)} – ${getTeamAbbr(s.away)}`,home:s.home,away:s.away,homeKey:s.home.toLowerCase(),awayKey:s.away.toLowerCase(),espnId,espnLeague:league,sofaId:null,fixtureId:null};
+  const ha=getTeamAbbr(s.home), aa=getTeamAbbr(s.away);
+  const mk=`${ha}-${aa}`;
+  const matchData={label:`${ha} – ${aa}`,home:s.home,away:s.away,homeKey:s.home.toLowerCase(),awayKey:s.away.toLowerCase(),espnId,espnLeague:league,sofaId:null,fixtureId:null};
+  // Save to Firebase immediately so the match appears right away
+  await set(ref(db,`config/matches/${mk}`),matchData);
+  document.getElementById('add-match-id').value='';
+  showToast(`${ha} – ${aa} lagt til ✅`);
+  // Fetch odds in background and patch if found
   if(oddsApiKey){
     showToast('Henter odds fra bookmaker...');
     const fetched=await fetchOddsForMatch(s.home,s.away,oddsApiKey);
-    if(fetched){ matchData.fetchedOdds=fetched; showToast(`${getTeamAbbr(s.home)} – ${getTeamAbbr(s.away)} lagt til med odds ✅`); }
-    else showToast(`${getTeamAbbr(s.home)} – ${getTeamAbbr(s.away)} lagt til (ingen odds funnet – sjekk API-nøkkel) ✅`);
-  } else {
-    showToast(`${getTeamAbbr(s.home)} – ${getTeamAbbr(s.away)} lagt til (ingen API-nøkkel) ✅`);
+    if(fetched){ await update(ref(db,`config/matches/${mk}`),{fetchedOdds:fetched}); showToast(`Odds oppdatert for ${ha} – ${aa} ✅`); }
+    else showToast(`Ingen odds funnet for ${ha} – ${aa}`);
   }
-  await set(ref(db,`config/matches/${mk}`),matchData);
-  document.getElementById('add-match-id').value='';
 };
 window.refreshMatchOdds=async function(mk){
   const m=MATCHES[mk]; if(!m||!oddsApiKey){showToast('Ingen API-nøkkel lagret');return;}
@@ -1517,8 +1519,8 @@ async function fetchOddsForMatch(home, away, apiKey){
   const proxy='https://corsproxy.io/?url=';
   function nameMatch(a,b){ a=a.toLowerCase().replace(/[^a-z]/g,''); b=b.toLowerCase().replace(/[^a-z]/g,''); return a.includes(b.substring(0,4))||b.includes(a.substring(0,4)); }
   let entry=null;
-  try{
-    for(const SPORT of SPORTS){
+  for(const SPORT of SPORTS){
+    try{
       const url=`https://api.the-odds-api.com/v4/sports/${SPORT}/odds/?apiKey=${apiKey}&regions=eu&markets=h2h,totals&oddsFormat=decimal`;
       const res=await Promise.race([
         fetch(proxy+encodeURIComponent(url)),
@@ -1532,7 +1534,9 @@ async function fetchOddsForMatch(home, away, apiKey){
         (nameMatch(m.home_team,away)&&nameMatch(m.away_team,home))
       );
       if(entry)break;
-    }
+    }catch(e){ console.warn('fetchOdds sport failed:',e); }
+  }
+  try{
     if(!entry)return null;
 
     // Determine if teams are swapped (Odds API home != our home)
