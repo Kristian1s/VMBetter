@@ -764,7 +764,7 @@ function renderMyOverview(){
   el.innerHTML=html;
 }
 window.selectMyPlayer=function(pid){ saveDeviceMapping(pid); renderPlayers(); };
-window.clearDevicePlayer=function(){ devicePlayerId=null; renderPlayers(); };
+window.clearDevicePlayer=function(){ localStorage.removeItem('vmbetter_player'); devicePlayerId=null; renderPlayers(); };
 window.addSelf=function(){
   const inp=document.getElementById('new-player-name');
   const name=inp?.value.trim(); if(!name)return;
@@ -2932,27 +2932,16 @@ window.clearTestScore=function(){
 };
 
 // ─── DEVICE IP AUTO-SELECT ───
-async function detectDevicePlayer(){
-  try{
-    const res=await fetch('https://api.ipify.org?format=json');
-    const {ip}=await res.json();
-    deviceIp=ip;
-    const safeIp=ip.replace(/\./g,'_').replace(/:/g,'-');
-    const snap=await new Promise(resolve=>onValue(ref(db,'ipmap/'+safeIp),resolve,{onlyOnce:true}));
-    const pid=snap.val();
-    if(pid&&players[pid]){
-      devicePlayerId=pid;
-      renderPlayerSelects();
-      if(currentTab==='spillere')renderMyOverview();
-    }
-  }catch(e){}
-}
-async function saveDeviceMapping(pid){
-  if(!deviceIp){
-    try{ const r=await fetch('https://api.ipify.org?format=json'); deviceIp=(await r.json()).ip; }catch{ return; }
+function detectDevicePlayer(){
+  const pid=localStorage.getItem('vmbetter_player');
+  if(pid&&players[pid]){
+    devicePlayerId=pid;
+    renderPlayerSelects();
+    if(currentTab==='spillere')renderMyOverview();
   }
-  const safeIp=deviceIp.replace(/\./g,'_').replace(/:/g,'-');
-  set(ref(db,'ipmap/'+safeIp),pid);
+}
+function saveDeviceMapping(pid){
+  localStorage.setItem('vmbetter_player',pid);
   devicePlayerId=pid;
   renderPlayerSelects();
 }
