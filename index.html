@@ -775,7 +775,7 @@ window.addSelf=function(){
 
 function renderPlayerSelects(){
   const sel=document.getElementById('tip-player-select'); if(!sel)return;
-  const cur=sel.value||devicePlayerId;
+  const cur=devicePlayerId||sel.value;
   // Suppress onchange during programmatic rebuild — mobile browsers can fire it
   // when innerHTML is replaced, which would reset the tip form mid-fill
   const oh=sel.onchange; sel.onchange=null;
