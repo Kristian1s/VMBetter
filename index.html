@@ -1515,15 +1515,14 @@ window.removeMatch=function(mk){
 };
 // ─── ODDS API FETCH ───
 async function fetchOddsForMatch(home, away, apiKey){
-  const SPORTS=['soccer_fifa_world_cup','soccer_friendly_international','soccer_uefa_nations_league','soccer_uefa_euro_qualification','soccer_fifa_world_cup_qualification_europe'];
-  const proxy='https://corsproxy.io/?url=';
+  const SPORTS=['soccer_fifa_world_cup'];
   function nameMatch(a,b){ a=a.toLowerCase().replace(/[^a-z]/g,''); b=b.toLowerCase().replace(/[^a-z]/g,''); return a.includes(b.substring(0,4))||b.includes(a.substring(0,4)); }
   let entry=null;
   for(const SPORT of SPORTS){
     try{
       const url=`https://api.the-odds-api.com/v4/sports/${SPORT}/odds/?apiKey=${apiKey}&regions=eu&markets=h2h,totals&oddsFormat=decimal`;
       const res=await Promise.race([
-        fetch(proxy+encodeURIComponent(url)),
+        fetch(url),
         new Promise((_,r)=>setTimeout(()=>r(new Error('timeout')),8000))
       ]);
       if(!res.ok)continue;
