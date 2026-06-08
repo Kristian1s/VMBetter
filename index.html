@@ -1374,13 +1374,29 @@ function generateBetCatalog(mk, home, away, homeKey, awayKey, fetchedOdds){
     o.h1Home  = fo.h1Home  || p(fo.homeOdds?fo.homeOdds*0.85:2.2);
     o.h1Away  = fo.h1Away  || p(fo.awayOdds?fo.awayOdds*0.85:5.5);
     o.h1Draw  = fo.h1Draw  || 3.2;
+    // Over/Under via cumulative Poisson on total goals (Poisson(μ))
+    function cdf(k){ let prob=0,t=Math.exp(-μ); prob+=t; for(let i=1;i<=k;i++){t*=μ/i;prob+=t;} return prob; }
+    o.o05=fo.over05 ||poissonOdds(1-cdf(0));
+    o.u05=fo.under05||poissonOdds(cdf(0));
+    o.o15=fo.over15 ||poissonOdds(1-cdf(1));
+    o.u15=fo.under15||poissonOdds(cdf(1));
+    o.o25=fo.over25 ||poissonOdds(1-cdf(2));
+    o.u25=fo.under25||poissonOdds(cdf(2));
+    o.o35=fo.over35 ||poissonOdds(1-cdf(3));
+    o.u35=fo.under35||poissonOdds(cdf(3));
+    o.o45=fo.over45 ||poissonOdds(1-cdf(4));
+    o.u45=fo.under45||poissonOdds(cdf(4));
   } else {
     o.fgHome=fo.fgHome||2.0; o.fgAway=fo.fgAway||3.5; o.fg15=2.8;
     o.btts=fo.btts||2.0; o.cleanH=fo.cleanH||2.8; o.cleanA=fo.cleanA||5.5;
     o.h1Goal=fo.h1Goal||1.7; o.h1NoGoal=fo.h1NoGoal||2.8;
     o.h1Home=fo.h1Home||2.2; o.h1Away=fo.h1Away||5.5; o.h1Draw=fo.h1Draw||3.0;
+    o.o05=fo.over05||1.1; o.u05=fo.under05||8.0;
+    o.o15=fo.over15||1.5; o.u15=fo.under15||3.5;
+    o.o25=fo.over25||2.0; o.u25=fo.under25||2.0;
+    o.o35=fo.over35||3.0; o.u35=fo.under35||1.5;
+    o.o45=fo.over45||5.5; o.u45=fo.under45||1.2;
   }
-  o.o15=fo.over15||1.5; o.o25=fo.over25||2.0; o.o35=fo.over35||3.0; o.o45=fo.over45||5.5;
 
   // Exact score odds via Poisson λ (direct or derived), else symmetric defaults
   let exactOdds;
@@ -1404,10 +1420,16 @@ function generateBetCatalog(mk, home, away, homeKey, awayKey, fetchedOdds){
       { id:"fg-home",    text:`${ha} scorer først`,               odds:o.fgHome,  resolve:(s,ev,ht,fin)=>firstScorerTeam(ev,hk,fin) },
       { id:"fg-away",    text:`${aa} scorer først`,               odds:o.fgAway,  resolve:(s,ev,ht,fin)=>firstScorerTeam(ev,ak,fin) },
       { id:"fg-15",      text:"Mål innen de første 15 min",       odds:o.fg15,    resolve:(s,ev,ht,fin)=>goalBefore(ev,16,fin) },
+      { id:"o05",        text:"Over 0,5 mål totalt",              odds:o.o05,     resolve:(s,ev,ht,fin)=>overGoals(s,0.5,fin) },
+      { id:"u05",        text:"Under 0,5 mål totalt",             odds:o.u05,     resolve:(s,ev,ht,fin)=>underGoals(s,0.5,fin) },
       { id:"o15",        text:"Over 1,5 mål totalt",              odds:o.o15,     resolve:(s,ev,ht,fin)=>overGoals(s,1.5,fin) },
+      { id:"u15",        text:"Under 1,5 mål totalt",             odds:o.u15,     resolve:(s,ev,ht,fin)=>underGoals(s,1.5,fin) },
       { id:"o25",        text:"Over 2,5 mål totalt",              odds:o.o25,     resolve:(s,ev,ht,fin)=>overGoals(s,2.5,fin) },
+      { id:"u25",        text:"Under 2,5 mål totalt",             odds:o.u25,     resolve:(s,ev,ht,fin)=>underGoals(s,2.5,fin) },
       { id:"o35",        text:"Over 3,5 mål totalt",              odds:o.o35,     resolve:(s,ev,ht,fin)=>overGoals(s,3.5,fin) },
+      { id:"u35",        text:"Under 3,5 mål totalt",             odds:o.u35,     resolve:(s,ev,ht,fin)=>underGoals(s,3.5,fin) },
       { id:"o45",        text:"Over 4,5 mål totalt",              odds:o.o45,     resolve:(s,ev,ht,fin)=>overGoals(s,4.5,fin) },
+      { id:"u45",        text:"Under 4,5 mål totalt",             odds:o.u45,     resolve:(s,ev,ht,fin)=>underGoals(s,4.5,fin) },
       { id:"btts",       text:"Begge lag scorer",                 odds:o.btts,    resolve:(s,ev,ht,fin)=>bothTeamsScored(s,fin) },
       { id:"clean-h",    text:`${ha} holder nullen`,              odds:o.cleanH,  resolve:(s,ev,ht,fin)=>fin?s.awayGoals===0:null },
       { id:"clean-a",    text:`${aa} holder nullen`,              odds:o.cleanA,  resolve:(s,ev,ht,fin)=>fin?s.homeGoals===0:null },
@@ -1570,15 +1592,15 @@ async function fetchOddsForMatch(home, away, apiKey){
 function poissonP(k,lambda){ let p=Math.exp(-lambda); for(let i=0;i<k;i++)p*=lambda/(i+1); return p; }
 
 function lambdasFromH2H(homeOdds,drawOdds,awayOdds){
-  // Convert to normalized implied probabilities
   const pH=1/homeOdds, pD=1/drawOdds, pA=1/awayOdds;
   const tot=pH+pD+pA;
   const nH=pH/tot, nA=pA/tot;
-  // Estimate team strengths from win probability ratio, anchored to WC avg 2.65 total goals
   const avgGoals=2.65;
   const ratio=Math.log(Math.max(nH,0.05)/Math.max(nA,0.05))/2;
-  const λH=Math.min(4,(avgGoals/2)*Math.exp(ratio));
-  const λA=Math.min(4,(avgGoals/2)*Math.exp(-ratio));
+  const rawH=Math.exp(ratio), rawA=Math.exp(-ratio);
+  // Normalize so λH+λA always equals avgGoals regardless of mismatch
+  const λH=avgGoals*rawH/(rawH+rawA);
+  const λA=avgGoals*rawA/(rawH+rawA);
   return{λH,λA};
 }
 
@@ -1720,6 +1742,7 @@ function firstScorerTeam(ev,teamKey,fin){ const g=goalEvents(ev); if(!g.length)r
 function firstScorerPlayer(ev,name,fin){ const g=goalEvents(ev); if(!g.length)return fin?false:null; return g[0].player?.name?.toLowerCase().includes(name.toLowerCase())||null; }
 function goalBefore(ev,min,fin){ if(goalEvents(ev).some(e=>e.time?.elapsed<min))return true; return fin?false:null; }
 function overGoals(s,line,fin){ const tot=(s.homeGoals||0)+(s.awayGoals||0); if(tot>line)return true; return fin?false:null; }
+function underGoals(s,line,fin){ const tot=(s.homeGoals||0)+(s.awayGoals||0); if(tot>=line)return false; return fin?true:null; }
 function bothTeamsScored(s,fin){ if((s.homeGoals||0)>0&&(s.awayGoals||0)>0)return true; return fin?false:null; }
 function teamScored(s,ev,teamKey,fin){ if((teamKey==='iraq'||teamKey==='senegal')?(s.awayGoals||0)>0:(s.homeGoals||0)>0)return true; return fin?false:null; }
 function hasCard(ev,type,fin){ if(ev.some(e=>e.type==='Card'&&e.detail===type))return true; return fin?false:null; }
