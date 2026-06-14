@@ -295,6 +295,7 @@ select option{background:var(--bg3)}
     <button class="tab tab-tv" onclick="showTab('odds')">⚙️ Odds</button>
     <button class="tab tab-tv" onclick="showTab('tv')">📺 Storskjerm</button>
     <button class="tab tab-tv" onclick="showTab('stats')">📊 Stats</button>
+    <button class="tab tab-tv" onclick="showTab('bets-admin')">🔍 Bets</button>
   </div>
 </header>
 
@@ -442,6 +443,9 @@ select option{background:var(--bg3)}
   <!-- ===== STATS ===== -->
   <div class="section" id="tab-stats"></div>
 
+  <!-- ===== BETS ADMIN ===== -->
+  <div class="section" id="tab-bets-admin"></div>
+
 </div>
 
 <div id="celebration">
@@ -532,7 +536,7 @@ onValue(ref(db,'config/matches'), s=>{
   if(currentTab==='spillere'&&isAdmin())renderAdminPlayers();
 });
 onValue(ref(db,'players'), s=>{ players=s.val()||{}; setSync(true); renderPlayers(); renderBettorSelect(); renderPlayerSelects(); if(currentTab==='poeng')renderScore(); if(currentTab==='tv')renderTV(); });
-onValue(ref(db,'bets'), s=>{ bets=s.val()||{}; if(currentTab==='betting')renderBets(); if(currentTab==='tv')renderTV(); if(currentTab==='spillere')renderPlayers(); if(currentTab==='stats')renderStats(); });
+onValue(ref(db,'bets'), s=>{ bets=s.val()||{}; if(currentTab==='betting')renderBets(); if(currentTab==='tv')renderTV(); if(currentTab==='spillere')renderPlayers(); if(currentTab==='stats')renderStats(); if(currentTab==='bets-admin')renderBetsAdmin(); });
 onValue(ref(db,'tips'), s=>{ tips=s.val()||{}; if(currentTab==='poeng')renderScore(); if(currentTab==='tv')renderTV(); if(currentTab==='spillere')renderPlayers(); if(currentTab==='stats')renderStats(); });
 onValue(ref(db,'config/manualOdds'), s=>{ manualOdds=s.val()||{}; rebuildBetCatalogs(); if(currentTab==='betting')renderBetCatalog(); if(currentTab==='odds')renderOddsAdmin(); });
 
@@ -544,9 +548,9 @@ window.showTab=function(id){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
   document.getElementById('tab-'+id).classList.add('active');
-  ['spillere','tipping','betting','odds','tv','stats'].forEach((t,i)=>{ const el=document.querySelectorAll('.tab')[i]; if(el)el.classList.toggle('active',t===id); });
+  ['spillere','tipping','betting','odds','tv','stats','bets-admin'].forEach((t,i)=>{ const el=document.querySelectorAll('.tab')[i]; if(el)el.classList.toggle('active',t===id); });
   const mw=document.getElementById('main-wrap');
-  if(id==='tv'||id==='stats'){ mw.style.maxWidth='none'; mw.style.padding='0'; mw.style.height='calc(100vh - 62px)'; }
+  if(id==='tv'||id==='stats'||id==='bets-admin'){ mw.style.maxWidth='none'; mw.style.padding='0'; mw.style.height='calc(100vh - 62px)'; }
   else{ mw.style.maxWidth=''; mw.style.padding=''; mw.style.height=''; }
   if(id==='spillere')renderPlayers();
   if(id==='tipping'){ renderPlayerSelects(); renderLiveBox(); renderMatchButtons(); }
@@ -555,6 +559,7 @@ window.showTab=function(id){
   if(id==='odds')renderOddsAdmin();
   if(id==='tv')renderTV();
   if(id==='stats')renderStats();
+  if(id==='bets-admin')renderBetsAdmin();
 };
 
 // ─── PLAYERS ───
@@ -774,7 +779,7 @@ function renderMyOverview(){
       const sl=b.status==='won'?'🎉 TREFF':b.status==='lost'?'❌ Bom':'⏳ Åpen';
       html+=`<div style="padding:8px 0;border-bottom:1px solid var(--border)">
         <div style="display:flex;justify-content:space-between;margin-bottom:2px">
-          <span style="font-size:12px;color:var(--text3)">${b.matchLabel||''} · ${b.odds}×</span>
+          <span style="font-size:12px;color:var(--text3)">${betMatchLabel(b)} · ${b.odds}×</span>
           <span style="font-size:12px;font-weight:600;color:${sc}">${sl}</span>
         </div>
         <div style="font-size:14px;font-weight:500">${b.desc}</div>
@@ -1340,6 +1345,13 @@ function getTeamAbbr(name){
   const n=name.toLowerCase();
   for(const[k,v]of Object.entries(ABBR_MAP)){ if(n.includes(k))return v; }
   return name.replace(/[^a-zA-Z ]/g,'').trim().split(' ').map(w=>w[0]||'').join('').substring(0,3).toUpperCase();
+}
+function betMatchLabel(b){
+  if(!b.isParlay||!b.legs)return b.matchLabel||'';
+  return b.legs.map(l=>{
+    const m=MATCHES[l.matchKey]; if(!m)return l.matchKey||'';
+    return`${teamFlag(m.home)}${getTeamAbbr(m.home)}+${teamFlag(m.away)}${getTeamAbbr(m.away)}`;
+  }).join(' / ');
 }
 
 // ─── REAL ODDS FOR KNOWN MATCHES ───
@@ -2658,10 +2670,10 @@ function renderTVTicker(){
           return`<span style="font-size:18px;color:${st==='won'?'var(--green)':st==='lost'?'var(--red)':'var(--text3)'}">${st==='won'?'✅':st==='lost'?'❌':'⏳'}</span>`;
         }).join('')}</div>`
       :'';
-    return`<div class="tv-ticker-card${isNew?' new':''}" style="border-color:${borderCol};background:rgba(239,159,39,0.06)">
+    return`<div class="tv-ticker-card${isNew?' new':''}" style="border-color:${borderCol};background:rgba(239,159,39,0.06);cursor:pointer" onclick="showBetDetail('${uid.slice(2)}')">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
         <span style="font-size:13px;font-weight:700;color:var(--amber);letter-spacing:.06em;text-transform:uppercase">🃏 Oddsen</span>
-        <span style="font-size:13px;color:var(--text3)">${b.matchLabel||''}</span>
+        <span style="font-size:12px;color:var(--text3)">${betMatchLabel(b)}</span>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:3px">
         <span style="font-size:28px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${b.placerName}</span>
@@ -3200,6 +3212,167 @@ function doPlaceParlay(){
 window.hideBetConfirm=function(){
   document.getElementById('bet-confirm-modal').style.display='none';
   pendingConfirm=null;
+};
+
+// ─── BET DETAIL MODAL (clickable from TV ticker) ───
+window.showBetDetail=function(betKey){
+  const b=bets[betKey]; if(!b)return;
+  const won=b.status==='won', lost=b.status==='lost';
+  const statusColor=won?'var(--green)':lost?'var(--red)':'var(--amber)';
+  const statusLabel=won?'✅ Vunnet':lost?'❌ Tapt':'⏳ Åpen';
+  const m=MATCHES[b.matchKey];
+  const score=liveScores[b.matchKey];
+
+  let html=`<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+    <div>
+      <div style="font-size:18px;font-weight:600">${b.placerName}</div>
+      <div style="font-size:13px;color:${statusColor};font-weight:600;margin-top:2px">${statusLabel}</div>
+    </div>
+    <div style="text-align:right">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:36px;color:var(--amber);line-height:1">${b.odds}×</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">🎯${b.stake} → 🏆${b.payout}T</div>
+    </div>
+  </div>`;
+
+  if(b.isParlay&&b.legs){
+    html+=`<div style="font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text3);margin-bottom:10px">🔗 Parlay – ${b.legs.length} ben · ${b.odds}× kombinert</div>`;
+    b.legs.forEach(l=>{
+      const ls=getParlayLegStatus(l);
+      const lc=ls==='won'?'var(--green)':ls==='lost'?'var(--red)':'var(--border2)';
+      const li=ls==='won'?'✅':ls==='lost'?'❌':'⏳';
+      const lm=MATCHES[l.matchKey], ls2=liveScores[l.matchKey];
+      const scStr=ls2&&ls2.status!=='NS'
+        ?`${teamFlag(lm?.home||'')}${getTeamAbbr(lm?.home||'')} ${ls2.homeGoals}–${ls2.awayGoals} ${teamFlag(lm?.away||'')}${getTeamAbbr(lm?.away||'')} (${ls2.status})`
+        :'Ikke startet';
+      html+=`<div style="padding:10px 12px;border:1px solid ${lc};border-radius:10px;margin-bottom:8px;background:${ls==='won'?'var(--green-light)':ls==='lost'?'var(--red-light)':'var(--bg3)'}">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+          <span style="font-size:20px">${li}</span>
+          <span style="font-size:12px;color:var(--text2)">${teamFlag(lm?.home||'')}${getTeamAbbr(lm?.home||'')} vs ${teamFlag(lm?.away||'')}${getTeamAbbr(lm?.away||'')}</span>
+          <span style="margin-left:auto;color:var(--amber);font-size:14px;font-weight:700">${l.odds}×</span>
+        </div>
+        <div style="font-size:15px;font-weight:600">${l.desc}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:4px">📊 ${scStr}</div>
+      </div>`;
+    });
+  } else {
+    const scStr=score&&score.status!=='NS'
+      ?`${teamFlag(m?.home||'')}${getTeamAbbr(m?.home||'')} ${score.homeGoals}–${score.awayGoals} ${teamFlag(m?.away||'')}${getTeamAbbr(m?.away||'')} (${score.status})`
+      :'Ikke startet';
+    html+=`<div style="padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg3)">
+      <div style="font-size:12px;color:var(--text3);margin-bottom:6px">${betMatchLabel(b)}</div>
+      <div style="font-size:16px;font-weight:600">${b.desc}</div>
+      <div style="font-size:13px;color:var(--text2);margin-top:6px">📊 ${scStr}</div>
+    </div>`;
+  }
+
+  document.getElementById('modal-content').innerHTML=html;
+  document.getElementById('modal-overlay').style.display='flex';
+};
+
+// ─── BETS ADMIN TAB ───
+function renderBetsAdmin(){
+  const el=document.getElementById('tab-bets-admin'); if(!el)return;
+  const allBets=Object.entries(bets).sort((a,b)=>(b[1].createdAt||0)-(a[1].createdAt||0));
+  if(!allBets.length){ el.innerHTML='<div style="padding:2rem;color:var(--text3);font-size:16px;text-align:center">Ingen bets ennå</div>'; return; }
+
+  function resolveNow(b){
+    if(b.isParlay||b.status!=='open')return null;
+    const mk=b.matchKey, sc=liveScores[mk];
+    if(!sc||sc.status==='NS')return null;
+    const def=getBetDef(mk,b.betId); if(!def?.resolve)return null;
+    const isFin=sc.status==='FT';
+    try{ return def.resolve({homeGoals:sc.homeGoals,awayGoals:sc.awayGoals},sc.events||[],sc.halftime,isFin); }catch(e){return null;}
+  }
+  function scoreStr(mk){
+    const sc=liveScores[mk], m=MATCHES[mk]; if(!sc||sc.status==='NS')return'';
+    return`${teamFlag(m?.home||'')}${getTeamAbbr(m?.home||mk)} ${sc.homeGoals}–${sc.awayGoals} ${teamFlag(m?.away||'')}${getTeamAbbr(m?.away||mk)} (${sc.status})`;
+  }
+
+  const byPlayer={};
+  allBets.forEach(([id,b])=>{
+    const k=b.placerId||'_';
+    if(!byPlayer[k])byPlayer[k]={name:b.placerName||'Ukjent',pid:k,betList:[]};
+    byPlayer[k].betList.push([id,b]);
+  });
+
+  const sections=Object.values(byPlayer).map(({name,pid,betList})=>{
+    const p=players[pid];
+    const openCount=betList.filter(([,b])=>b.status==='open').length;
+    const wonCount=betList.filter(([,b])=>b.status==='won').length;
+    const lostCount=betList.filter(([,b])=>b.status==='lost').length;
+    betList.sort(([,a],[,b])=>{ const ao=a.status==='open',bo=b.status==='open'; if(ao!==bo)return ao?-1:1; return(b.createdAt||0)-(a.createdAt||0); });
+
+    const betRows=betList.map(([id,b])=>{
+      const won=b.status==='won', lost=b.status==='lost';
+      const statusColor=won?'var(--green)':lost?'var(--red)':'var(--amber)';
+      const statusBg=won?'var(--green-light)':lost?'var(--red-light)':'var(--amber-light)';
+      const statusLabel=won?'✅ Vunnet':lost?'❌ Tapt':'⏳ Åpen';
+      const resolvedNow=resolveNow(b);
+      const mismatch=resolvedNow===true?'⚠️ Bør vinne nå!':resolvedNow===false?'⚠️ Bør tape nå':null;
+
+      let legsHTML='';
+      if(b.isParlay&&b.legs){
+        legsHTML=b.legs.map(l=>{
+          const ls=getParlayLegStatus(l);
+          const lc=ls==='won'?'var(--green)':ls==='lost'?'var(--red)':'var(--text3)';
+          const li=ls==='won'?'✅':ls==='lost'?'❌':'⏳';
+          const lm=MATCHES[l.matchKey], ls2=liveScores[l.matchKey];
+          const sc2=ls2&&ls2.status!=='NS'?` · ${getTeamAbbr(lm?.home||'')} ${ls2.homeGoals}–${ls2.awayGoals} ${getTeamAbbr(lm?.away||'')} (${ls2.status})`:'';
+          return`<div style="display:flex;align-items:flex-start;gap:6px;font-size:13px;padding:4px 0 4px 10px;border-left:2px solid ${lc};margin-top:4px">
+            <span>${li}</span>
+            <div><span style="font-weight:500">${l.desc}</span><span style="color:var(--amber)"> ${l.odds}×</span><span style="color:var(--text2)">${sc2}</span></div>
+          </div>`;
+        }).join('');
+      }
+      const sc=scoreStr(b.matchKey);
+
+      return`<div style="padding:10px 12px;border-bottom:1px solid var(--border);${won?'background:rgba(29,158,117,0.04)':lost?'background:rgba(226,75,74,0.04)':''}">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;flex-wrap:wrap">
+          <span style="font-size:11px;font-weight:700;color:${statusColor};padding:2px 8px;border-radius:20px;background:${statusBg}">${statusLabel}</span>
+          <span style="font-size:12px;color:var(--text3)">${betMatchLabel(b)}</span>
+          ${b.isParlay?`<span style="font-size:11px;color:var(--blue);font-weight:600">🔗 ${b.legs?.length||''}ben parlay</span>`:''}
+          ${mismatch?`<span style="font-size:11px;color:var(--red);font-weight:700;padding:2px 8px;border-radius:20px;background:var(--red-light)">${mismatch}</span>`:''}
+        </div>
+        <div style="font-size:15px;font-weight:500;margin-bottom:3px">${b.desc}</div>
+        ${legsHTML}
+        <div style="font-size:12px;color:var(--text2);margin-top:5px;display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+          <span style="color:var(--amber);font-weight:600">${b.odds}×</span>
+          <span>🎯${b.stake} → 🏆${b.payout}T</span>
+          ${sc?`<span style="color:var(--text3)">📊 ${sc}</span>`:''}
+        </div>
+        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+          ${b.status!=='won'?`<button class="btn btn-sm" style="border-color:var(--green);color:var(--green)" onclick="forceResolveBet('${id}','won')">✅ Force Won</button>`:''}
+          ${b.status!=='lost'?`<button class="btn btn-sm" style="border-color:var(--red);color:var(--red)" onclick="forceResolveBet('${id}','lost')">❌ Force Lost</button>`:''}
+          ${b.status!=='open'?`<button class="btn btn-sm" onclick="forceResolveBet('${id}','open')">↩️ Reopen</button>`:''}
+          <button class="btn btn-sm btn-red" onclick="deleteBet('${id}')">🗑️ Slett</button>
+        </div>
+      </div>`;
+    }).join('');
+
+    const avatar=p?avatarEl(p,pid):'<div class="avatar"><span>?</span></div>';
+    return`<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg3)">
+        ${avatar}
+        <div style="flex:1">
+          <div style="font-size:16px;font-weight:600">${name}</div>
+          <div style="font-size:12px;color:var(--text2)">✅${wonCount} vunnet · ❌${lostCount} tapt · ⏳${openCount} åpne</div>
+        </div>
+      </div>
+      ${betRows}
+    </div>`;
+  }).join('');
+
+  el.innerHTML=`<div style="padding:1rem;max-width:900px;margin:0 auto">
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:1px;margin-bottom:12px">🔍 Bets Admin</div>
+    ${sections}
+  </div>`;
+}
+
+window.forceResolveBet=function(id,status){
+  const label=status==='won'?'vunnet':status==='lost'?'tapt':'åpen';
+  if(!confirm(`Sett bet til "${label}"?`))return;
+  update(ref(db),{[`bets/${id}/status`]:status});
+  showToast(`Bet satt til ${label} ✅`);
 };
 </script>
 
