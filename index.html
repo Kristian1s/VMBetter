@@ -2242,11 +2242,32 @@ window.renderBetCatalog = function(){
   }).join('');
 };
 
+function getBetFamily(betId){
+  if(/^o[0-9]5$/.test(betId)) return 'over-goals';
+  if(/^u[0-9]5$/.test(betId)) return 'under-goals';
+  if(betId.startsWith('res-')) return 'exact-score';
+  if(['h1-home','h1-away','h1-draw'].includes(betId)) return 'h1-result';
+  if(['h1-goal','h1-nogoal'].includes(betId)) return 'h1-goals';
+  if(['fg-home','fg-away'].includes(betId)) return 'first-goal-team';
+  if(['pen-any','pen-scored','pen-miss'].includes(betId)) return 'penalty';
+  if(['yc-o3','yc-o5'].includes(betId)) return 'yellow-cards';
+  return betId;
+}
+
 window.toggleBetSelection = function(mk, betId){
   const def = getBetDef(mk, betId); if(!def) return;
   const idx = parlayLegs.findIndex(l=>l.matchKey===mk&&l.betId===betId);
   if(idx >= 0) parlayLegs.splice(idx, 1);
-  else parlayLegs.push({matchKey:mk, betId, desc:def.text, odds:def.odds});
+  else {
+    const family = getBetFamily(betId);
+    const clash = parlayLegs.find(l=>l.matchKey===mk&&getBetFamily(l.betId)===family);
+    if(clash){
+      const names={'over-goals':'Over mål','under-goals':'Under mål','exact-score':'Eksakt resultat','h1-result':'Pause-resultat','h1-goals':'Pause-mål','first-goal-team':'Første lag scorer','penalty':'Straffe','yellow-cards':'Gule kort'};
+      showToast(`Kan ikke kombinere to ${names[family]||family}-bets fra samme kamp ❌`);
+      return;
+    }
+    parlayLegs.push({matchKey:mk, betId, desc:def.text, odds:def.odds});
+  }
   if(parlayLegs.length === 0){
     document.getElementById('bet-place-panel').style.display='none';
     document.getElementById('parlay-builder-panel').style.display='none';
