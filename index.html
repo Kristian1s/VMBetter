@@ -496,9 +496,9 @@ let oddsAdminUnlocked = false;
 // Match-specific player scorer bonuses — keyed by match key
 const MATCH_PLAYER_BETS = {
   'NOR-IRQ': [
-    { field:'haaland',    label:'Haaland scorer?',   prefix:'hal', abbr:'HAA', names:['haaland'] },
-    { field:'odegaard',   label:'Ødegaard scorer?',  prefix:'ode', abbr:'ODE', names:['ødegaard','odegaard'] },
-    { field:'iraqscores', label:'Irak scorer?',      prefix:'irq', abbr:'IRQ', awayScores:true }
+    { field:'haaland2', label:'Haaland 2+ mål?',    prefix:'h2a', abbr:'H2+', resolve:(s,ev,ht,fin)=>playerGoalCount(ev,'Haaland',2,fin) },
+    { field:'sorloth',  label:'Sørloth scorer?',     prefix:'sol', abbr:'SOR', names:['sørloth','sorloth'] },
+    { field:'redcard',  label:'Rødt kort i kampen?', prefix:'rdc', abbr:'RDC', resolve:(s,ev,ht,fin)=>hasCard(ev,'Red Card',fin) }
   ],
   'FRA-SEN': [
     { field:'mbappe', label:'Mbappé scorer?',    prefix:'mbp', abbr:'MBP', names:['mbappe','mbappé'] },
@@ -513,7 +513,7 @@ let players={}, bets={}, tips={};
 let selectedBettors=new Set();
 let currentTab='spillere';
 let liveScores={};
-let tipForm={ hub:null, homeGoals:'', awayGoals:'', firstScorer:null, firstHalfGoal:null, haaland:null, odegaard:null, iraqscores:null, mbappe:null, mane:null };
+let tipForm={ hub:null, homeGoals:'', awayGoals:'', firstScorer:null, firstHalfGoal:null, haaland:null, odegaard:null, iraqscores:null, mbappe:null, mane:null, haaland2:null, sorloth:null, redcard:null };
 let toastTimer;
 let selectedTipMatch='';
 let selectedBetMatch='';
@@ -1077,8 +1077,14 @@ function calcLivePoints(mk, score){
 
     // Bonus: match-specific player scorers (1p each)
     for(const pb of matchPlayers){
-      const scored=pb.awayScores?ag>0:goalEvents(events).some(e=>pb.names.some(n=>e.player?.name?.toLowerCase().includes(n)));
-      if(scored){ if(t[pb.field]==='Y')pts+=1; } else if(isFinal){ if(t[pb.field]==='N')pts+=1; }
+      if(pb.resolve){
+        const actual=pb.resolve({homeGoals:hg,awayGoals:ag},events,null,isFinal);
+        if(actual===true){ if(t[pb.field]==='Y')pts+=1; }
+        else if(actual===false){ if(t[pb.field]==='N')pts+=1; }
+      } else {
+        const scored=pb.awayScores?ag>0:goalEvents(events).some(e=>pb.names.some(n=>e.player?.name?.toLowerCase().includes(n)));
+        if(scored){ if(t[pb.field]==='Y')pts+=1; } else if(isFinal){ if(t[pb.field]==='N')pts+=1; }
+      }
     }
 
     upd[`tips/${tid}/livePoints`]=pts;
@@ -1265,7 +1271,7 @@ window.renderTipForm=function(){
     if(existing){ showLockedTip(mk,existing,el); return; }
   }
   const match=MATCHES[mk];
-  tipForm={hub:null,homeGoals:'',awayGoals:'',firstScorer:null,firstHalfGoal:null,haaland:null,mbappe:null,mane:null};
+  tipForm={hub:null,homeGoals:'',awayGoals:'',firstScorer:null,firstHalfGoal:null,haaland:null,odegaard:null,iraqscores:null,mbappe:null,mane:null,haaland2:null,sorloth:null,redcard:null};
   const matchPlayers=MATCH_PLAYER_BETS[mk]||[];
   el.innerHTML=`
     <div class="card"><div class="card-label">Utfall — opptil 7 poeng</div>
@@ -1308,7 +1314,7 @@ window.renderTipForm=function(){
   document.getElementById('drum-ag-wrap')?.appendChild(makeDrumPicker('tip-ag'));
 };
 window.selHub=function(v){ tipForm.hub=v; ['H','U','B'].forEach(x=>document.getElementById('hub-'+x)?.classList.toggle('selected',x===v)); };
-window.selBonus=function(field,val,el){ tipForm[field]=val; const pfx={firstScorer:'fs',firstHalfGoal:'fhg',haaland:'hal',odegaard:'ode',iraqscores:'irq',mbappe:'mbp',mane:'mne'}[field]; document.querySelectorAll(`[id^="${pfx}-"]`).forEach(e=>e.classList.remove('selected')); el.classList.add('selected'); };
+window.selBonus=function(field,val,el){ tipForm[field]=val; const pfx={firstScorer:'fs',firstHalfGoal:'fhg',haaland:'hal',odegaard:'ode',iraqscores:'irq',mbappe:'mbp',mane:'mne',haaland2:'h2a',sorloth:'sol',redcard:'rdc'}[field]; document.querySelectorAll(`[id^="${pfx}-"]`).forEach(e=>e.classList.remove('selected')); el.classList.add('selected'); };
 window.submitTip=function(mk){
   if(liveScores[mk]&&liveScores[mk].status!=='NS'){ showToast('Kampen har startet – tipping stengt! 🔒'); return; }
   const pid=document.getElementById('tip-player-select').value;
@@ -2796,8 +2802,15 @@ window.showBreakdown=function(playerId){
       if(fhg||isFT){ const hit=(t.firstHalfGoal==='Y')===fhg; rows+=breakdown('⏱️ Mål i 1. omgang', hit?1:0, hit); }
       else{ rows+=breakdown('⏱️ Mål i 1. omgang', '?', null); }
       (MATCH_PLAYER_BETS[mk]||[]).forEach(pb=>{
-        const scored=goalEvents(evs).some(e=>pb.names.some(n=>e.player?.name?.toLowerCase().includes(n)));
-        playerScoredBreakdown(`🔵 ${pb.label}`, pb.field, scored);
+        if(pb.resolve){
+          const actual=pb.resolve({homeGoals:score?.homeGoals||0,awayGoals:score?.awayGoals||0},evs,null,isFT);
+          if(actual===true){ rows+=breakdown(`🔵 ${pb.label}`,t[pb.field]==='Y'?1:0,t[pb.field]==='Y'); }
+          else if(actual===false){ rows+=breakdown(`🔵 ${pb.label}`,t[pb.field]==='N'?1:0,t[pb.field]==='N'); }
+          else{ rows+=breakdown(`🔵 ${pb.label}`,'?',null); }
+        } else {
+          const scored=goalEvents(evs).some(e=>pb.names.some(n=>e.player?.name?.toLowerCase().includes(n)));
+          playerScoredBreakdown(`🔵 ${pb.label}`, pb.field, scored);
+        }
       });
     }
 
