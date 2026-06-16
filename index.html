@@ -495,7 +495,7 @@ let oddsAdminUnlocked = false;
 
 // Match-specific player scorer bonuses — keyed by match key
 const MATCH_PLAYER_BETS = {
-  'NOR-IRQ': [
+  'IRQ-NOR': [
     { field:'haaland2', label:'Haaland 2+ mål?',    prefix:'h2a', abbr:'H2+', resolve:(s,ev,ht,fin)=>playerGoalCount(ev,'Haaland',2,fin) },
     { field:'sorloth',  label:'Sørloth scorer?',     prefix:'sol', abbr:'SOR', names:['sørloth','sorloth'] },
     { field:'redcard',  label:'Rødt kort i kampen?', prefix:'rdc', abbr:'RDC', resolve:(s,ev,ht,fin)=>hasCard(ev,'Red Card',fin) }
