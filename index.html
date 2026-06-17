@@ -2932,19 +2932,23 @@ function renderTVLive(){
 function renderTVSlurkebet(){
   const stage = document.getElementById('slurkebet-podium-stage'); if(!stage)return;
   const list = Object.entries(players).map(([id,p])=>{
-    return [id, p, getTokensWon(id), getTokensSpent(id)];
+    const bal=getTokenBalance(id);
+    const net=bal-TOKEN_BUDGET;
+    return [id, p, bal, net];
   }).sort((a,b)=>b[2]-a[2]);
 
   const spots=[{rank:2,spot:'spot-2',idx:1},{rank:1,spot:'spot-1',idx:0},{rank:3,spot:'spot-3',idx:2}];
   stage.innerHTML=spots.map(({rank,spot,idx})=>{
     const entry=list[idx];
     if(!entry)return`<div class="podium-spot ${spot}"><div style="height:80px"></div><div class="podium-block"><span class="podium-num">${rank}</span></div></div>`;
-    const [id,p,won,spent]=entry;
+    const [id,p,bal,net]=entry;
+    const netStr=net>=0?`+${net}`:`${net}`;
+    const netCol=net>=0?'var(--green)':'var(--red)';
     return`<div class="podium-spot ${spot}">
       ${miiHTML(p,id,spot)}
       <div class="mii-label">${p.name}</div>
-      <div class="mii-pts">🎯 +${won} tokens</div>
-      <div style="font-size:11px;color:var(--text3);text-align:center;margin-bottom:4px">${TOKEN_BUDGET-spent} av ${TOKEN_BUDGET} igjen</div>
+      <div class="mii-pts" style="color:${netCol}">${netStr} tokens</div>
+      <div style="font-size:11px;color:var(--text3);text-align:center;margin-bottom:4px">${bal} totalt</div>
       <div class="podium-block"><span class="podium-num">${rank}</span></div>
     </div>`;
   }).join('');
